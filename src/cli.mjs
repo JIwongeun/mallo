@@ -279,7 +279,8 @@ async function release(args) {
   const action = args.shift();
   if (action === "build") {
     const sourceRoot = resolve(option(args, "--source") ?? process.cwd());
-    process.stdout.write(`${JSON.stringify(await buildRelease({ sourceRoot, dataRoot, ref: option(args, "--ref") ?? "HEAD" }), null, 2)}\n`);
+    const { files, ...built } = await buildRelease({ sourceRoot, dataRoot, ref: option(args, "--ref") ?? "HEAD" });
+    process.stdout.write(`${JSON.stringify({ ...built, file_count: files.length }, null, 2)}\n`);
   } else if (action === "inspect") {
     const target = option(args, "--runtime");
     if (!target) throw new Error("release inspect requires --runtime");

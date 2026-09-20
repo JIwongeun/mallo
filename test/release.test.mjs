@@ -39,6 +39,27 @@ test("release build uses an exact clean commit and detects tampering", async () 
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+test("release build CLI prints a compact result while persisting the full manifest", async () => {
+  const root = await mkdtemp(join(tmpdir(), "relay-release-cli-"));
+  try {
+    const source = await fixtureSource(resolve(root, "source"));
+    const data = resolve(root, "data");
+    const result = spawnSync(process.execPath, [resolve(source, "src", "cli.mjs"), "release", "build", "--ref", "HEAD"], {
+      cwd: source,
+      env: { ...process.env, CODEX_HOME: resolve(root, "home"), CODEX_SYSTEM_DATA_ROOT: data },
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    const manifest = JSON.parse(await readFile(resolve(output.runtime_root, "release-manifest.json"), "utf8"));
+    assert.equal(Object.hasOwn(output, "files"), false);
+    assert.equal(output.file_count, manifest.files.length);
+    assert.ok(manifest.files.length > 0);
+    assert.equal(output.package_sha256, manifest.package_sha256);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("promotion records the previous release and rollback preserves Knowledge", async () => {
   const root = await mkdtemp(join(tmpdir(), "relay-release-promote-"));
   const priorHome = process.env.CODEX_HOME;
