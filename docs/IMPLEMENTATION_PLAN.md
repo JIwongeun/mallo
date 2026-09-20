@@ -1,6 +1,6 @@
 # Sol implementation handoff — independent Relay plugin
 
-Status: **implemented and installed; native hook re-trust and new-task UI observation pending**, revised 2026-09-20. R0-R8 replace the earlier hub/workspace plan. The completed M0-M7 release remains a historical baseline; its checks do not close these new gates. Current evidence is summarized in section 8 and the ignored `.local/implementation-evidence/release-vnext.json` record.
+Status: **implemented, installed and accepted**, revised 2026-09-20. R0-R8 replace the earlier hub/workspace plan. The completed M0-M7 release remains a historical baseline. Current evidence is summarized in section 8 and the ignored `.local/implementation-evidence/release-vnext.json` record.
 
 ## 1. Required outcome and agreed scope
 
@@ -204,11 +204,11 @@ Use existing modules before adding files. Proposed commands below are targets, n
 | R1 | passed | Runtime/data/project paths are separate. Release tests package a clean commit, verify every file, move the source checkout out of reach, and start the packaged CLI. Installed releases also completed an external-project run without importing the source checkout. |
 | R2 | passed | Registry tests cover unregistered plain folders, Git repositories and linked worktrees; SessionStart inspection is read-only; admission uses Git local exclude instead of editing project `.gitignore`. |
 | R3 | passed | Canonical schema-2 Knowledge embeds observations and survives origin deletion and backup/restore. Legacy migration skipped the two provenance-confirmed fixture-only lessons and admitted no personal fixture data. |
-| R4 | pending native trust | Relay metadata, original transparent icon, entry skill and durable progress events validate. Native discovery found `codex-system:relay`, the installed hook and the promoted cache, but the changed owned hook correctly reports `trustStatus: modified`; user review/trust and new-task UI observation remain. |
+| R4 | passed | Relay metadata, original transparent icon, entry skill and durable progress events validate. Native discovery found the enabled `codex-system:relay` skill and the owned SessionStart hook at hash `d7e568b4...`; after explicit user review, App Server reported `trustStatus: trusted`. The user confirmed Relay name/icon/startup context in a new Codex task, and the installed hook emitted `RELAY:AVAILABLE` with current-folder-only guidance. |
 | R5 | passed | All 12 provenance-confirmed fixtures, linked worktree, trial run state and legacy `brain/` were removed. Two obsolete validation tasks were archived to release Windows handles. `workspace/` is absent. |
-| R6 | passed with native evidence | Unit acceptance covers immutable build, tamper rejection, previous release preservation, active-run blocking and Knowledge-preserving rollback. The first live acceptance, `run-73b959e8-ea53-4484-9ab3-71c839a074ff` on `0.2.0-198444d103d0`, was blocked because the sandbox could not spawn `npm test` (`CreateProcessAsUserW failed: 2`, Windows error 2). Commit `e38cfde` (`fix: run Node checks without npm wrapper`) replaced the wrapper, and `run-609e1003-e754-4cec-a350-eab236f2b282` on `0.2.0-e38cfde908ee` completed with exit code 0 and 2/2 fixture tests passing. The real promote/rollback/re-promote sequence completed; the installation receipt now records `0.2.0-bc114394e530` active and retains `0.2.0-e38cfde908ee` as previous. This does not establish installed UI trust. |
+| R6 | passed with native evidence | Unit acceptance covers immutable build, tamper rejection, previous release preservation, active-run blocking and Knowledge-preserving rollback. The first live acceptance, `run-73b959e8-ea53-4484-9ab3-71c839a074ff` on `0.2.0-198444d103d0`, was blocked because the sandbox could not spawn `npm test` (`CreateProcessAsUserW failed: 2`, Windows error 2). Commit `e38cfde` (`fix: run Node checks without npm wrapper`) replaced the wrapper, and `run-609e1003-e754-4cec-a350-eab236f2b282` on `0.2.0-e38cfde908ee` completed with exit code 0 and 2/2 fixture tests passing. The real promote/rollback/re-promote sequence completed. The installation receipt records `0.2.0-b581dd93f327` active, `0.2.0-36709c266616` recoverable as previous, and package digest `3ce957bd...`; final release inspection verified all 265 files. |
 | R7 | passed | Installed run `run-e05948fb-7593-4614-947d-616c2efb5111` on `0.2.0-e38cfde908ee` used Astra planning, Sol implementation and Astra review to add compact release output; its blocked check exposed global-temp denial. Installed run `run-f7fffb08-79ee-4e52-9010-1ca5be9b3c2f` exposed the remaining Git-boundary and Relay-environment leak. After both controller fixes, installed run `run-4ff6fa7c-2aa3-400c-8b40-aee2c99caf78` on `0.2.0-36709c266616` changed this repository through the Relay skill, passed 44/44 sandboxed tests and completed after Astra review. Each run retained its installed release ID while editing source. |
-| R8 | pending one native action | Code, tests, cleanup, releases, rollback, progress and self-development are verified. R8 waits only for review/trust of the changed Relay-owned hook and observation from a new Codex task; no bypass is accepted as trust evidence. |
+| R8 | passed | Final source tests passed 44/44, installed doctor reported required capabilities ready with no blockers, the immutable `v0.2.0` runtime verified against source commit `b581dd93`, and native skill/hook discovery passed. The owned hook was explicitly trusted and observed in a new task without bypass. External extensions, real Knowledge and user changes were preserved; no remote push or public publication occurred. |
 
 ### R0 — Checkpoint and freeze the legacy runtime
 
@@ -257,7 +257,7 @@ Gate R3: [x] origin deletion does not downgrade complete evidence or break later
 3. Apply Relay display and `relay` entry skill; update recursion exclusions/framework source IDs. Keep MCP IDs/data paths stable and verify implicit/explicit invocation after native reload.
 4. Generate icon assets using image/plugin skills, preview small/light/dark versions, validate manifest paths and verify native discovery. No unsupported custom UI or duplicate installed plugin.
 
-Gate R4: [ ] actual chat shows factual model/stage/check/Knowledge progress; reconnect/busy/cancel behavior is clear; metadata/icons validate and are observed in the installed UI.
+Gate R4: [x] actual chat shows factual model/stage/check/Knowledge progress; reconnect/busy/cancel behavior is clear; metadata/icons validate and are observed in the installed UI.
 
 ### R5 — Delete synthetic workspace data and obsolete paths
 
@@ -293,9 +293,9 @@ Gate R7: [x] installed-skill self-development actually uses Astra/Sol, preserves
 1. Run the appropriate full regression suite after stabilization; repeat affected tests after actual fixes. Inspect Git content for secrets, fixture data and personal Knowledge.
 2. Complete the matrix below with compact real evidence and labeled fixtures. Reuse earlier observations only when their relevant hashes/assumptions match.
 3. Update README to real install/use/update/rollback commands and limits. Record final commit, installed package, data root and pending native actions. Check gates only from observed results.
-4. Complete a new implementation Goal only after required gates pass. The earlier completed Goal remains historical; this document does not create or reopen one. Required trust/discovery still pending means acceptance is incomplete.
+4. Complete the implementation Goal only after required gates pass. The earlier completed M0-M7 Goal remains historical. Native trust and new-task discovery were confirmed after explicit user review.
 
-Gate R8: [ ] R0-R7 evidence supports the final revision; installation, scope, Knowledge independence, cleanup, progress, appearance, self-development, update and rollback work with consistent Git/runtime/data identities.
+Gate R8: [x] R0-R7 evidence supports the final revision; installation, scope, Knowledge independence, cleanup, progress, appearance, self-development, update and rollback work with consistent Git/runtime/data identities.
 
 ## 9. Acceptance matrix
 
