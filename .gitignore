@@ -1,0 +1,7 @@
+# Child projects own their source, history, and execution records.
+/workspace/
+
+# Personal learned knowledge and machine-specific runtime state.
+/brain/
+/.local/
+/node_modules/

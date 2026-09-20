@@ -1,0 +1,23 @@
+{
+  "name": "codex-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "codex-system": "src/cli.mjs"
+  },
+  "scripts": {
+    "doctor": "node src/cli.mjs doctor --json",
+    "install:integration": "node src/cli.mjs install",
+    "uninstall:integration": "node src/cli.mjs uninstall",
+    "test": "node --test \"test/*.test.mjs\"",
+    "test:live": "node src/cli.mjs smoke dispatch --write-evidence"
+  },
+  "dependencies": {
+    "yaml": "2.8.1"
+  },
+  "packageManager": "pnpm@11.19.0"
+}

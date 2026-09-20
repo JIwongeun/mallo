@@ -1,0 +1,26 @@
+{
+  "name": "codex-system",
+  "version": "0.1.1+codex.20260920071315",
+  "mcpServers": "./.mcp.json",
+  "description": "Routes registered local project work through the Codex System Astra/Sol pipeline.",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex System",
+    "shortDescription": "Route project work through Astra and Sol",
+    "longDescription": "Binds registered local projects, routes planning and implementation to Astra or Sol, runs checks, and records evidence-backed lessons.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [
+      "Instructions",
+      "Lifecycle hooks",
+      "Local execution"
+    ],
+    "defaultPrompt": [
+      "Use Codex System for this project task.",
+      "Show the latest Codex System run status."
+    ]
+  }
+}

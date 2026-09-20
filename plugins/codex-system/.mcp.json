@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "codex_system": {
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-Command",
+        "$codexHome = if ($env:CODEX_HOME) { $env:CODEX_HOME } else { Join-Path $HOME '.codex' }; $pointerPath = Join-Path $codexHome 'codex-system.json'; $pointer = [IO.File]::ReadAllText($pointerPath, [Text.Encoding]::UTF8) | ConvertFrom-Json; & $pointer.node_path (Join-Path $pointer.hub_root 'plugins\\codex-system\\server.mjs'); exit $LASTEXITCODE"
+      ],
+      "enabled": true,
+      "default_tools_approval_mode": "approve",
+      "startup_timeout_sec": 10,
+      "tool_timeout_sec": 3600,
+      "env_vars": [
+        "CODEX_HOME",
+        "HOME",
+        "USERPROFILE",
+        "PATH"
+      ]
+    }
+  }
+}
