@@ -24,7 +24,7 @@ node src/cli.mjs release inspect --runtime C:\Users\<user>\.codex\codex-system\r
 node src/cli.mjs release promote --runtime C:\Users\<user>\.codex\codex-system\releases\<release-id>
 ```
 
-프로모션은 활성 실행이 없고 패키지 해시·Git 커밋·플러그인 버전이 일치할 때만 성공합니다. 설치본은 개발 소스와 분리된 불변 디렉터리에서 실행됩니다. 플러그인 스냅샷은 기존 작업에 핫 리로드되지 않으므로 업데이트 후 새 Codex 작업에서 확인합니다.
+프로모션은 활성 실행이 없고 패키지 해시·Git 커밋·플러그인 버전이 일치할 때만 성공합니다. 설치본은 개발 소스와 분리된 불변 디렉터리에서 실행됩니다. 플러그인 업데이트 시 Relay 소유 훅이 수정된 것으로 표시될 수 있으므로, 사용자는 Codex에서 새 훅 리비전을 검토하고 신뢰한 뒤 새 플러그인 스냅샷을 불러올 새 Codex 작업을 시작해야 합니다.
 
 ```powershell
 node src/cli.mjs release rollback

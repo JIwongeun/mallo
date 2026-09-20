@@ -1,6 +1,6 @@
 # Sol implementation handoff — independent Relay plugin
 
-Status: **implementation and local release verification in progress**, revised 2026-09-20. R0-R8 replace the earlier hub/workspace plan. The completed M0-M7 release remains a historical baseline; its checks do not close these new gates. Current evidence is summarized in section 8 and the ignored `.local/implementation-evidence/release-vnext.json` record.
+Status: **implemented and installed; native hook re-trust and new-task UI observation pending**, revised 2026-09-20. R0-R8 replace the earlier hub/workspace plan. The completed M0-M7 release remains a historical baseline; its checks do not close these new gates. Current evidence is summarized in section 8 and the ignored `.local/implementation-evidence/release-vnext.json` record.
 
 ## 1. Required outcome and agreed scope
 
@@ -204,11 +204,11 @@ Use existing modules before adding files. Proposed commands below are targets, n
 | R1 | passed | Runtime/data/project paths are separate. Release tests package a clean commit, verify every file, move the source checkout out of reach, and start the packaged CLI. Installed releases also completed an external-project run without importing the source checkout. |
 | R2 | passed | Registry tests cover unregistered plain folders, Git repositories and linked worktrees; SessionStart inspection is read-only; admission uses Git local exclude instead of editing project `.gitignore`. |
 | R3 | passed | Canonical schema-2 Knowledge embeds observations and survives origin deletion and backup/restore. Legacy migration skipped the two provenance-confirmed fixture-only lessons and admitted no personal fixture data. |
-| R4 | code verified | Relay metadata, original transparent icon, entry skill and durable progress events validate. Promotion and native package discovery were recorded, but installed UI trust was not observed. |
+| R4 | pending native trust | Relay metadata, original transparent icon, entry skill and durable progress events validate. Native discovery found `codex-system:relay`, the installed hook and the promoted cache, but the changed owned hook correctly reports `trustStatus: modified`; user review/trust and new-task UI observation remain. |
 | R5 | passed | All 12 provenance-confirmed fixtures, linked worktree, trial run state and legacy `brain/` were removed. Two obsolete validation tasks were archived to release Windows handles. `workspace/` is absent. |
 | R6 | passed with native evidence | Unit acceptance covers immutable build, tamper rejection, previous release preservation, active-run blocking and Knowledge-preserving rollback. The first live acceptance, `run-73b959e8-ea53-4484-9ab3-71c839a074ff` on `0.2.0-198444d103d0`, was blocked because the sandbox could not spawn `npm test` (`CreateProcessAsUserW failed: 2`, Windows error 2). Commit `e38cfde` (`fix: run Node checks without npm wrapper`) replaced the wrapper, and `run-609e1003-e754-4cec-a350-eab236f2b282` on `0.2.0-e38cfde908ee` completed with exit code 0 and 2/2 fixture tests passing. The real promote/rollback/re-promote sequence completed; the installation receipt now records `0.2.0-bc114394e530` active and retains `0.2.0-e38cfde908ee` as previous. This does not establish installed UI trust. |
-| R7 | in progress | Installed run `run-e05948fb-7593-4614-947d-616c2efb5111` on `0.2.0-e38cfde908ee` used Astra planning, Sol implementation and Astra review to add compact release output, but its controller check was blocked because the Windows sandbox denied global temp writes. After the first temp fix, installed run `run-f7fffb08-79ee-4e52-9010-1ca5be9b3c2f` on `0.2.0-bc114394e530` updated this evidence but correctly remained blocked: 39 tests passed and 5 exposed that a project-local temp changed Git identity while Relay-only environment variables leaked into checks. The controller now uses the independent data-root temp as an explicit writable root and removes those Relay variables; 44/44 normal tests and an actual sandboxed `command/exec` full-suite check pass. R7 remains in progress until a fixed installed run is terminal and its candidate is promoted. |
-| R8 | pending | Final acceptance follows real promotion, rollback, native discovery and R7 proof. |
+| R7 | passed | Installed run `run-e05948fb-7593-4614-947d-616c2efb5111` on `0.2.0-e38cfde908ee` used Astra planning, Sol implementation and Astra review to add compact release output; its blocked check exposed global-temp denial. Installed run `run-f7fffb08-79ee-4e52-9010-1ca5be9b3c2f` exposed the remaining Git-boundary and Relay-environment leak. After both controller fixes, installed run `run-4ff6fa7c-2aa3-400c-8b40-aee2c99caf78` on `0.2.0-36709c266616` changed this repository through the Relay skill, passed 44/44 sandboxed tests and completed after Astra review. Each run retained its installed release ID while editing source. |
+| R8 | pending one native action | Code, tests, cleanup, releases, rollback, progress and self-development are verified. R8 waits only for review/trust of the changed Relay-owned hook and observation from a new Codex task; no bypass is accepted as trust evidence. |
 
 ### R0 — Checkpoint and freeze the legacy runtime
 
@@ -218,7 +218,7 @@ Use existing modules before adding files. Proposed commands below are targets, n
 4. Point only the framework's owned launch configuration/receipt at that verified legacy runtime, including server and CLI. Keep a recoverable prior pointer. Only the selected legacy data copy is active; repository data becomes migration input, not a second writable store.
 5. This initial upgrade runs normally in the Sol implementation task: v0.1 cannot yet self-manage this repo. Do not claim self-hosting prematurely. Remove bootstrap-only branches after independent runtime validation while preserving an honest legacy rollback boundary.
 
-Gate R0: [ ] reviewed baseline commit exists; editing candidate source does not change installed execution bytes; legacy startup/data binding and owned pointer recovery pass.
+Gate R0: [x] reviewed baseline commit exists; editing candidate source does not change installed execution bytes; legacy startup/data binding and owned pointer recovery pass.
 
 ### R1 — Separate paths and package the complete runtime
 
@@ -228,7 +228,7 @@ Gate R0: [ ] reviewed baseline commit exists; editing candidate source does not 
 4. Verify installed-root resolution for MCP and hooks, custom CODEX_HOME, Unicode/spaces, and desktop startup without developer PATH. Any runtime locator must identify the immutable release, never editable source.
 5. Separate receipts from personal data; preserve uninstall ownership checks. Ignore generated packages and local artifacts.
 
-Gate R1: [ ] a bounded installed task works with source checkout unavailable; no imports/defaults reference it; installed files remain unchanged; Windows/custom-home launch checks pass.
+Gate R1: [x] a bounded installed task works with source checkout unavailable; no imports/defaults reference it; installed files remain unchanged; Windows/custom-home launch checks pass.
 
 ### R2 — Automatically bind the selected folder
 
@@ -238,7 +238,7 @@ Gate R1: [ ] a bounded installed task works with source checkout unavailable; no
 4. Preserve existing check configuration. For new projects, inspect real manifests/test tooling and derive or propose justified argv, frozen before mutation. Do not require every user to hand-author `.codex-system-checks.json`, invent passing checks, or run arbitrary model-provided shell strings. An unresolved essential check blocks implementation honestly; planning may proceed.
 5. Keep necessary `.gitignore`/local-setup edits minimal and scoped. Ask for target selection only when the native session provides no unambiguous primary folder.
 
-Gate R2: [ ] external Git/plain/worktree/source-repo tasks bind without registration; ambiguous/secondary/junction cases preserve scope; information-only visits create no records.
+Gate R2: [x] external Git/plain/worktree/source-repo tasks bind without registration; ambiguous/secondary/junction cases preserve scope; information-only visits create no records.
 
 ### R3 — Implement independent Knowledge
 
@@ -248,7 +248,7 @@ Gate R2: [ ] external Git/plain/worktree/source-repo tasks bind without registra
 4. Make search/rebuild/feedback/relations/backup operate on canonical Knowledge alone. Recheck applicability and present at most three cards.
 5. In an isolated data root, execute a task, capture a real lesson, remove the disposable source project, rebuild and reuse the lesson in another project. Keep observations separate from fixtures injected for failure-branch tests.
 
-Gate R3: [ ] origin deletion does not downgrade complete evidence or break later reuse; restored Knowledge needs no project folders; failed/review-only/duplicate/revised observations remain correct; no acceptance lessons pollute personal data.
+Gate R3: [x] origin deletion does not downgrade complete evidence or break later reuse; restored Knowledge needs no project folders; failed/review-only/duplicate/revised observations remain correct; no acceptance lessons pollute personal data.
 
 ### R4 — Improve progress and Relay presentation
 
@@ -267,7 +267,7 @@ Gate R4: [ ] actual chat shows factual model/stage/check/Knowledge progress; rec
 4. Remove the empty workspace directory, creation assumptions, `workspace_child`, permanent fixture machinery and obsolete source-pointer branches. Tests default to temp folders and isolated Knowledge. Retain legacy ignore coverage until deleted paths cannot accidentally enter Git.
 5. Rename current Brain references to Knowledge; label narrow compatibility code. Remove duplication without removing checks, scope isolation, locks or recovery.
 
-Gate R5: [ ] workspace is absent and never recreated; known trial knowledge is gone; tests leave personal state unchanged; no stale runtime dependency or unexplained deletion remains.
+Gate R5: [x] workspace is absent and never recreated; known trial knowledge is gone; tests leave personal state unchanged; no stale runtime dependency or unexplained deletion remains.
 
 ### R6 — Implement verified releases and rollback
 
@@ -277,7 +277,7 @@ Gate R5: [ ] workspace is absent and never recreated; known trial knowledge is g
 4. Exercise dirty-source rejection, tampering, failed build, interrupted installation, trust pending, loaded-session mismatch, failure and rollback. Preserve newer Knowledge/settings.
 5. Record source commit, base/native version, package digest, installed path, previous version, data schema and health. Local immutable tags identify verified source. No remote push/public release.
 
-Gate R6: [ ] A remains unchanged while B is edited; unverified B cannot activate; fresh native discovery uses promoted B; compatible rollback preserves data; active runs block updates and release identity is visible.
+Gate R6: [x] A remains unchanged while B is edited; unverified B cannot activate; fresh native discovery uses promoted B; compatible rollback preserves data; active runs block updates and release identity is visible.
 
 ### R7 — Prove self-development through the installed skill
 
@@ -286,7 +286,7 @@ Gate R6: [ ] A remains unchanged while B is edited; unverified B cannot activate
 3. Verify executing release hashes remain identical before/after source edits. Locally commit the verified change, build its candidate, wait for the old run to finish, and promote outside that managed run.
 4. Verify the next eligible session reports the new release. Reuse R6 artifacts/checks; do not manufacture redundant releases or claim an existing chat hot-reloaded.
 
-Gate R7: [ ] installed-skill self-development actually uses Astra/Sol, preserves the running release and then activates the verified candidate in native discovery; direct outer-chat edits/mocked workers do not count.
+Gate R7: [x] installed-skill self-development actually uses Astra/Sol, preserves the running release and then activates the verified candidate in native discovery; direct outer-chat edits/mocked workers do not count.
 
 ### R8 — Final acceptance and handoff
 
