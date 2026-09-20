@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cp, mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -18,6 +18,19 @@ test("release build uses an exact clean commit and detects tampering", async () 
     assert.equal(installation.active.release_id, "existing");
     assert.equal(installation.candidate.release_id, built.release_id);
     assert.equal((await inspectRelease({ runtimeRoot: built.runtime_root })).source_sha, built.source_sha);
+    const unavailable = resolve(root, "source-unavailable");
+    const project = resolve(root, "project");
+    await mkdir(project);
+    await rename(source, unavailable);
+    const startup = spawnSync(process.execPath, [resolve(built.runtime_root, "src", "cli.mjs"), "hook-context", "--cwd", project], {
+      cwd: project,
+      env: { ...process.env, CODEX_SYSTEM_DATA_ROOT: data },
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    assert.equal(startup.status, 0, startup.stderr);
+    assert.match(startup.stdout, /RELAY:AVAILABLE/);
+    await rename(unavailable, source);
     await writeFile(resolve(built.runtime_root, "config", "routing.yaml"), "tampered: true\n");
     await assert.rejects(inspectRelease({ runtimeRoot: built.runtime_root }), /integrity/);
     await writeFile(resolve(source, "README-dirty.md"), "untracked is ignored by the committed build\n");

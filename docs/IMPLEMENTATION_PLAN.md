@@ -1,6 +1,6 @@
 # Sol implementation handoff — independent Relay plugin
 
-Status: **planned, not implemented**, revised 2026-09-20. R0-R8 replace the earlier hub/workspace plan. The completed M0-M7 release remains a historical baseline; its checks do not close these new gates. This documentation revision does not change the installed plugin, delete fixtures, commit source, or create a Goal.
+Status: **implementation and local release verification in progress**, revised 2026-09-20. R0-R8 replace the earlier hub/workspace plan. The completed M0-M7 release remains a historical baseline; its checks do not close these new gates. Current evidence is summarized in section 8 and the ignored `.local/implementation-evidence/release-vnext.json` record.
 
 ## 1. Required outcome and agreed scope
 
@@ -195,6 +195,20 @@ Use chat commentary/native tool presentation first; custom native widgets are no
 ## 8. Ordered implementation slices
 
 Use existing modules before adding files. Proposed commands below are targets, not existing features. Keep one ignored vNext state/evidence record separate from completed M0-M7. Verify each gate before progressing to dependent work; continue independent work when a native action is pending.
+
+### Current implementation record
+
+| Gate | State | Evidence |
+| --- | --- | --- |
+| R0 | passed | Baseline commit `c0e9438`; frozen runtime `legacy-0.1.1-c0e9438`; executable hash `04d35198d347e758d1e438967de3b6e38de50b5636d7ffdae92af04b5ee6ad0c`; owned pointer backup and startup check recorded locally. |
+| R1 | code verified | Runtime/data/project paths are separate. Release tests package a clean commit, verify every file, move the source checkout out of reach, and start the packaged CLI. Real candidate promotion remains under R6. |
+| R2 | passed | Registry tests cover unregistered plain folders, Git repositories and linked worktrees; SessionStart inspection is read-only; admission uses Git local exclude instead of editing project `.gitignore`. |
+| R3 | passed | Canonical schema-2 Knowledge embeds observations and survives origin deletion and backup/restore. Legacy migration skipped the two provenance-confirmed fixture-only lessons and admitted no personal fixture data. |
+| R4 | code verified | Relay metadata, original transparent icon, entry skill and durable progress events validate. Installed UI observation requires the promoted native snapshot. |
+| R5 | passed | All 12 provenance-confirmed fixtures, linked worktree, trial run state and legacy `brain/` were removed. Two obsolete validation tasks were archived to release Windows handles. `workspace/` is absent. |
+| R6 | code verified | Unit acceptance covers immutable build, tamper rejection, previous release preservation, active-run blocking and Knowledge-preserving rollback. Real promote/rollback/re-promote remains pending. |
+| R7 | pending native proof | The installed legacy skill was invoked first and correctly failed on its registration rule. Exact installed-Relay self-development requires a new eligible task after R6 promotion; outer-chat implementation is not counted. |
+| R8 | pending | Final acceptance follows real promotion, rollback, native discovery and R7 proof. |
 
 ### R0 — Checkpoint and freeze the legacy runtime
 
