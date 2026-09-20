@@ -539,15 +539,36 @@ async function deriveChecks(projectRoot) {
   try {
     const pkg = JSON.parse(await readFile(resolve(projectRoot, "package.json"), "utf8"));
     if (pkg.scripts?.test && !/no test specified/i.test(pkg.scripts.test)) {
-      const declared = pkg.packageManager?.split("@")[0];
-      const manager = declared || (await exists(resolve(projectRoot, "pnpm-lock.yaml")) ? "pnpm" : "npm");
-      candidates.push({ id: "project-tests", argv: [manager, "test"], timeout_ms: 300_000 });
+      const direct = parseNodeTestScript(pkg.scripts.test);
+      if (direct) candidates.push({ id: "project-tests", argv: direct, timeout_ms: 300_000 });
+      else {
+        const declared = pkg.packageManager?.split("@")[0];
+        const manager = declared || (await exists(resolve(projectRoot, "pnpm-lock.yaml")) ? "pnpm" : "npm");
+        const executable = await findExecutable(manager);
+        if (executable) candidates.push({ id: "project-tests", argv: [executable, "test"], timeout_ms: 300_000 });
+      }
     }
   } catch (error) { if (error.code !== "ENOENT") throw new Error(`Invalid package.json while deriving checks: ${error.message}`); }
   if (candidates.length === 0 && await exists(resolve(projectRoot, "Cargo.toml"))) candidates.push({ id: "cargo-tests", argv: ["cargo", "test"], timeout_ms: 300_000 });
   if (candidates.length === 0 && (await exists(resolve(projectRoot, "pyproject.toml")) || await exists(resolve(projectRoot, "pytest.ini")))) candidates.push({ id: "python-tests", argv: ["python", "-m", "pytest"], timeout_ms: 300_000 });
   const hash = `derived:${createHash("sha256").update(JSON.stringify(candidates)).digest("hex")}`;
   return { checks: candidates, hash, source: candidates.length ? "derived" : "unresolved" };
+}
+
+function parseNodeTestScript(script) {
+  const match = /^\s*node(?:\.exe)?\s+--test(?:\s+([\s\S]*?))?\s*$/i.exec(script);
+  if (!match) return null;
+  const rest = match[1]?.trim();
+  if (!rest) return [process.execPath, "--test"];
+  const args = [];
+  const token = /"([^"]*)"|'([^']*)'|([^\s"']+)/g;
+  let cursor = 0;
+  for (let item; (item = token.exec(rest));) {
+    if (rest.slice(cursor, item.index).trim()) return null;
+    args.push(item[1] ?? item[2] ?? item[3]);
+    cursor = token.lastIndex;
+  }
+  return rest.slice(cursor).trim() || args.length === 0 ? null : [process.execPath, "--test", ...args];
 }
 
 async function exists(path) {

@@ -1,6 +1,6 @@
 {
   "name": "codex-system",
-  "version": "0.2.0+codex.20260920101947",
+  "version": "0.2.0+codex.20260920102817",
   "mcpServers": "./.mcp.json",
   "description": "Plans, builds, verifies, and remembers work in the current folder with Astra and Sol.",
   "author": {

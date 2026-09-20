@@ -76,6 +76,16 @@ test("check configuration is fixed before workers run and execution uses native 
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
+test("derived node tests do not require npm or pnpm wrappers", async () => {
+  const root = await mkdtemp(join(tmpdir(), "relay-derived-check-"));
+  try {
+    await writeFile(resolve(root, "package.json"), JSON.stringify({ scripts: { test: 'node --test "test/*.test.mjs"' } }));
+    const snapshot = await loadChecks(root);
+    assert.deepEqual(snapshot.checks[0].argv, [process.execPath, "--test", "test/*.test.mjs"]);
+    assert.equal(snapshot.source, "derived");
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("transport rejects disconnected turns immediately and declines permission grants correctly", async () => {
   const client = new AppServerClient({ codexPath: "unused" });
   client.request = async () => ({ turn: { id: "turn-1" } });
