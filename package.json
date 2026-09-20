@@ -3,6 +3,14 @@
   "version": "0.2.1",
   "private": true,
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JIwongeun/mallo.git"
+  },
+  "homepage": "https://github.com/JIwongeun/mallo#readme",
+  "bugs": {
+    "url": "https://github.com/JIwongeun/mallo/issues"
+  },
   "engines": {
     "node": ">=24"
   },

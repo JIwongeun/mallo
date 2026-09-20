@@ -1,3 +1,21 @@
-# Machine-specific runtime state and dependencies.
+# Runtime state and dependencies.
+/.codex-system/
 /.local/
-/node_modules/
+node_modules/
+/.pnpm-store/
+
+# Local environment and secrets.
+.env
+.env.*
+!.env.example
+!.env.sample
+/.secrets/
+/secrets/
+/*.key
+/*.pem
+
+# Generated temporary artifacts.
+/.tmp/
+/tmp/
+/*.tmp
+/*.log
