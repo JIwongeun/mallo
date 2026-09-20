@@ -16,8 +16,9 @@ Codex에서 대상 폴더를 열고 평소처럼 요청합니다. SessionStart �
 - Node.js 24 이상(지원 기준 Node 24), `pnpm@11.19.0`, Git, `tar`
 - 호환되는 로그인된 Codex와 실행 호스트에서 사용 가능한 `gpt-5.6-sol`, `gpt-6-astra`
 - 두 모델의 medium, high, xhigh reasoning effort
+- `config/skills.yaml`에 선언된 필수 `review-agent` 스킬. 외부 스킬은 사용자가 별도로 관리합니다.
 
-오프라인 저장소 테스트에는 Codex 로그인이나 자격 증명이 필요하지 않습니다. `doctor`는 실제 Codex, 모델, 스킬, 훅 가용성을 확인하는 별도의 라이브 진단입니다.
+오프라인 저장소 테스트에는 Codex 로그인이나 자격 증명이 필요하지 않습니다. `doctor`는 Codex 인증·모델과 스킬·훅 목록 조회를 확인하는 라이브 진단이며, 개별 필수 스킬의 존재나 훅 신뢰를 보증하지 않습니다.
 
 ```powershell
 pnpm install --frozen-lockfile
@@ -30,6 +31,8 @@ node src/cli.mjs doctor --json
 ## 수동 설치와 업데이트
 
 Mallo에는 범용 설치 프로그램이나 자동 업데이트가 없습니다. 검토된 로컬 Git 커밋과 그 커밋에 일치하는 깨끗한 소스 체크아웃에서 다음 명령을 실행합니다.
+
+처음 설치하는 PC에서는 저장소 루트에서 `codex plugin marketplace add .`로 이 저장소의 marketplace를 등록합니다. 기존 `personal` marketplace가 이미 이 저장소를 가리키면 생략합니다. 다른 저장소를 가리키는 동일 이름의 marketplace는 덮어쓰지 말고 먼저 구성을 확인합니다.
 
 ```powershell
 pnpm install --frozen-lockfile

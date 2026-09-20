@@ -22,27 +22,31 @@ const requestProperties = {
 const tools = [
   {
     name: "start_managed_task",
+    title: "Start Mallo task",
     description: "Start one current-folder request through Mallo and return its run ID. Use the exact user message, normalized project task, and current cwd.",
     inputSchema: { type: "object", properties: requestProperties, required: ["request", "original_request", "cwd"], additionalProperties: false },
-    annotations: { destructiveHint: false, openWorldHint: false },
+    annotations: { title: "Start Mallo task", destructiveHint: false, openWorldHint: false },
   },
   {
     name: "await_managed_task",
+    title: "Check Mallo progress",
     description: "Wait briefly for a managed run, then return its durable state and outcome. Repeat until terminal or needs_input.",
     inputSchema: { type: "object", properties: { run_id: { type: "string" }, timeout_ms: { type: "integer", minimum: 0, maximum: 30_000 }, after_revision: { type: "integer", minimum: 0 } }, required: ["run_id"], additionalProperties: false },
-    annotations: { readOnlyHint: true, openWorldHint: false },
+    annotations: { title: "Check Mallo progress", readOnlyHint: true, openWorldHint: false },
   },
   {
     name: "respond_managed_task",
+    title: "Send answer to Mallo",
     description: "Deliver the user's actual answer or approval to the exact pending request of a managed run.",
     inputSchema: { type: "object", properties: { run_id: { type: "string" }, request_id: { type: "string" }, payload: { type: "object" } }, required: ["run_id", "request_id", "payload"], additionalProperties: false },
-    annotations: { destructiveHint: false, openWorldHint: false },
+    annotations: { title: "Send answer to Mallo", destructiveHint: false, openWorldHint: false },
   },
   {
     name: "cancel_managed_task",
+    title: "Cancel Mallo task",
     description: "Request cancellation of an active managed run.",
     inputSchema: { type: "object", properties: { run_id: { type: "string" } }, required: ["run_id"], additionalProperties: false },
-    annotations: { destructiveHint: false, openWorldHint: false },
+    annotations: { title: "Cancel Mallo task", destructiveHint: false, openWorldHint: false },
   },
 ];
 
@@ -68,7 +72,7 @@ async function handle(message) {
     if (message.method === "initialize") return send(message.id, {
       protocolVersion: message.params?.protocolVersion ?? "2024-11-05",
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "codex-system", version: "0.2.1" },
+      serverInfo: { name: "mallo", title: "Mallo", version: "0.2.2" },
     });
     if (message.method === "ping") return send(message.id, {});
     if (message.method === "tools/list") return send(message.id, { tools });

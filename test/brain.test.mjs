@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, unlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, rm, unlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { ProjectRegistry } from "../src/bindings.mjs";
@@ -8,7 +8,7 @@ import { applyFeedback, mergeCandidate, rebuildKnowledge, searchKnowledge } from
 import { readYaml, writeYamlAtomic } from "../src/contracts.mjs";
 
 test("Knowledge deduplicates evidence, isolates projects, and survives origin deletion", async () => {
-  const hub = await mkdtemp(join(tmpdir(), "codex-system-brain-"));
+  const hub = await realpath(await mkdtemp(join(tmpdir(), "codex-system-brain-")));
   try {
     const first = resolve(hub, "workspace", "first");
     const second = resolve(hub, "workspace", "second");

@@ -50,10 +50,14 @@ if (action === "run") {
   };
   try {
     const initialized = await request(1, "initialize", { protocolVersion: "2024-11-05" });
-    assert.equal(initialized.serverInfo.name, "codex-system");
-    assert.equal(initialized.serverInfo.version, "0.2.1");
+    assert.deepEqual(initialized.serverInfo, { name: "mallo", title: "Mallo", version: "0.2.2" });
     const listed = await request(2, "tools/list", {});
-    assert.deepEqual(listed.tools.map(({ name }) => name), ["start_managed_task", "await_managed_task", "respond_managed_task", "cancel_managed_task"]);
+    assert.deepEqual(listed.tools.map(({ name, title, annotations }) => [name, title, annotations.title]), [
+      ["start_managed_task", "Start Mallo task", "Start Mallo task"],
+      ["await_managed_task", "Check Mallo progress", "Check Mallo progress"],
+      ["respond_managed_task", "Send answer to Mallo", "Send answer to Mallo"],
+      ["cancel_managed_task", "Cancel Mallo task", "Cancel Mallo task"],
+    ]);
     assert.match(listed.tools[0].description, /Mallo/);
     const started = parseText(await request(3, "tools/call", { name: "start_managed_task", arguments: { request: "Test", original_request: "$review-agent Test", cwd: hub, explicit_skills: ["review-agent"] } }));
     assert.equal(started.run_id, runId);

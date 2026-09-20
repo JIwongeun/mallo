@@ -1,6 +1,6 @@
 {
   "name": "codex-system",
-  "version": "0.2.1+codex.20260920113744",
+  "version": "0.2.2+codex.20260920121845",
   "mcpServers": "./.mcp.json",
   "description": "A small, formless companion that adapts through verified lessons from the user's work.",
   "author": {

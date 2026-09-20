@@ -57,7 +57,7 @@ export class AppServerClient extends EventEmitter {
     });
 
     const response = await this.request("initialize", {
-      clientInfo: { name: "mallo", title: "Mallo", version: "0.2.1" },
+      clientInfo: { name: "mallo", title: "Mallo", version: "0.2.2" },
       capabilities: {
         experimentalApi: true,
         requestAttestation: false,

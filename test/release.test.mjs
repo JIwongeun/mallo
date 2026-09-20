@@ -9,6 +9,7 @@ import { buildRelease, inspectRelease, promoteRelease, rollbackRelease } from ".
 
 test("Mallo branding, entry skill, assets, and versions stay consistent", async () => {
   const manifest = JSON.parse(await readFile(resolve("plugins/codex-system/.codex-plugin/plugin.json"), "utf8"));
+  const mcpConfig = JSON.parse(await readFile(resolve("plugins/codex-system/.mcp.json"), "utf8"));
   const packageJson = JSON.parse(await readFile(resolve("package.json"), "utf8"));
   const skill = await readFile(resolve("plugins/codex-system/skills/mallo/SKILL.md"), "utf8");
   const hooks = await readFile(resolve("plugins/codex-system/hooks/hooks.json"), "utf8");
@@ -17,19 +18,23 @@ test("Mallo branding, entry skill, assets, and versions stay consistent", async 
   const server = await readFile(resolve("plugins/codex-system/server.mjs"), "utf8");
   const client = await readFile(resolve("src/codex.mjs"), "utf8");
   const mascot = await readFile(resolve("plugins/codex-system/assets/mallo.png"));
-  assert.equal(packageJson.version, "0.2.1");
-  assert.equal(manifest.version.split("+")[0], "0.2.1");
+  assert.equal(packageJson.version, "0.2.2");
+  assert.equal(manifest.name, "codex-system");
+  assert.equal(manifest.version.split("+")[0], "0.2.2");
+  assert.deepEqual(Object.keys(mcpConfig.mcpServers), ["mallo"]);
   assert.equal(manifest.interface.displayName, "Mallo");
   assert.match(manifest.description, /small, formless companion.*verified lessons/);
   assert.deepEqual([manifest.interface.composerIcon, manifest.interface.logo, manifest.interface.logoDark], Array(3).fill("./assets/mallo.png"));
   assert.equal(createHash("sha256").update(mascot).digest("hex").toUpperCase(), "E6119BD24978C2D32DE0C8E643B47546C2B0B6ECC785C39A8DC07FA58A8BE4B9");
   assert.match(skill, /^name: mallo$/m);
+  for (const name of ["start_managed_task", "await_managed_task", "respond_managed_task"]) assert.match(skill, new RegExp(`mcp__mallo__${name}`));
+  assert.doesNotMatch(skill, /mcp__codex_system__/);
   assert.match(hooks, /Checking Mallo availability/);
   assert.match(config, /codex-system:mallo/);
   assert.match(config, /plugin:codex-system:skills\/mallo/);
   assert.match(readme, /^경험을 먹고, 당신에게 맞춰지는 작은 생물\.$/m);
-  assert.match(server, /serverInfo: \{ name: "codex-system", version: "0\.2\.1" \}/);
-  assert.match(client, /clientInfo: \{ name: "mallo", title: "Mallo", version: "0\.2\.1" \}/);
+  assert.match(server, /serverInfo: \{ name: "mallo", title: "Mallo", version: "0\.2\.2" \}/);
+  assert.match(client, /clientInfo: \{ name: "mallo", title: "Mallo", version: "0\.2\.2" \}/);
   for (const obsolete of ["plugins/codex-system/skills/relay/SKILL.md", "plugins/codex-system/assets/relay-icon.png", "plugins/codex-system/assets/relay-logo.png", "plugins/codex-system/assets/relay-logo-dark.png"]) await assert.rejects(access(resolve(obsolete)));
 });
 

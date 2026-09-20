@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "codex_system": {
+    "mallo": {
       "command": "powershell.exe",
       "args": [
         "-NoProfile",

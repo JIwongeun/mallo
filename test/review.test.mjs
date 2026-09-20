@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile, symlink } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, realpath, rm, writeFile, symlink } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -52,7 +52,7 @@ test("schema validation covers required work and bounds instead of relying on se
 });
 
 test("check configuration is fixed before workers run and execution uses native sandbox", async () => {
-  const root = await mkdtemp(join(tmpdir(), "codex-check-policy-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "codex-check-policy-")));
   try {
     const path = resolve(root, ".codex-system-checks.json");
     const config = { checks: [{ id: "test", argv: ["node", "--test"], timeout_ms: 1000 }] };
@@ -82,7 +82,7 @@ test("check configuration is fixed before workers run and execution uses native 
 });
 
 test("derived node tests do not require npm or pnpm wrappers", async () => {
-  const root = await mkdtemp(join(tmpdir(), "relay-derived-check-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "relay-derived-check-")));
   try {
     await writeFile(resolve(root, "package.json"), JSON.stringify({ scripts: { test: 'node --test "test/*.test.mjs"' } }));
     const snapshot = await loadChecks(root);
@@ -122,7 +122,7 @@ test("usage accumulates turn deltas without counting cumulative events twice", a
 });
 
 test("source snapshots detect committed changes even when git diff is empty", async () => {
-  const root = await mkdtemp(join(tmpdir(), "codex-snapshot-review-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "codex-snapshot-review-")));
   try {
     const git = (args) => assert.equal(spawnSync("git", ["-C", root, ...args], { windowsHide: true }).status, 0);
     git(["init"]); git(["config", "user.name", "Fixture"]); git(["config", "user.email", "fixture@example.invalid"]);
@@ -134,7 +134,7 @@ test("source snapshots detect committed changes even when git diff is empty", as
 });
 
 test("failed execution creates a provisional scoped lesson and source index exceeds 100 entries", async () => {
-  const root = await mkdtemp(join(tmpdir(), "codex-brain-review-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "codex-brain-review-")));
   try {
     const project = resolve(root, "workspace", "app"); await mkdir(project, { recursive: true });
     const registry = new ProjectRegistry({ hubRoot: root }); const entry = await registry.register(project);

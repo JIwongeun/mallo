@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { access, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -16,7 +16,7 @@ test("path containment rejects siblings and traversal", () => {
 });
 
 test("registry admits the selected folder without prior registration and inspect stays read-only", async () => {
-  const hub = await mkdtemp(join(tmpdir(), "codex-system-바인딩-"));
+  const hub = await realpath(await mkdtemp(join(tmpdir(), "codex-system-바인딩-")));
   try {
     const child = join(hub, "workspace", "child project");
     const sibling = join(hub, "workspace", "other");
@@ -38,7 +38,7 @@ test("registry admits the selected folder without prior registration and inspect
 });
 
 test("git worktrees share project identity and retain their own cwd", async () => {
-  const hub = await mkdtemp(join(tmpdir(), "codex-system-worktree-"));
+  const hub = await realpath(await mkdtemp(join(tmpdir(), "codex-system-worktree-")));
   try {
     const source = join(hub, "workspace", "source");
     const worktree = join(hub, "workspace", "worktree");
@@ -65,7 +65,7 @@ test("git worktrees share project identity and retain their own cwd", async () =
 });
 
 test("atomic YAML records round trip", async () => {
-  const root = await mkdtemp(join(tmpdir(), "codex-system-record-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "codex-system-record-")));
   try {
     const path = join(root, "nested", "record.yaml");
     await writeYamlAtomic(path, { schema_version: 1, value: "ok" });
@@ -128,7 +128,7 @@ test("planned changes stay inside declared files", () => {
 });
 
 test("project snapshots detect changes without counting run records", async () => {
-  const root = await mkdtemp(join(tmpdir(), "codex-system-snapshot-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "codex-system-snapshot-")));
   try {
     await writeYamlAtomic(join(root, "file.yaml"), { value: 1 });
     const before = await projectSnapshot(root);
@@ -142,7 +142,7 @@ test("project snapshots detect changes without counting run records", async () =
 });
 
 test("worker-visible run records cannot change without detection", async () => {
-  const root = await mkdtemp(join(tmpdir(), "codex-protected-records-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "codex-protected-records-")));
   try {
     await writeYamlAtomic(join(root, "task.yaml"), { value: 1 });
     await writeYamlAtomic(join(root, "state.yaml"), { revision: 1 });
@@ -157,7 +157,7 @@ test("worker-visible run records cannot change without detection", async () => {
 });
 
 test("stale lock recovery replaces only the observed dead owner", async () => {
-  const root = await mkdtemp(join(tmpdir(), "codex-lock-recovery-"));
+  const root = await realpath(await mkdtemp(join(tmpdir(), "codex-lock-recovery-")));
   try {
     const path = join(root, "writer.lock");
     await writeFile(path, JSON.stringify({ pid: 2147483647, nonce: "dead-owner" }));
