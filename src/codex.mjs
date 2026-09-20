@@ -57,7 +57,7 @@ export class AppServerClient extends EventEmitter {
     });
 
     const response = await this.request("initialize", {
-      clientInfo: { name: "codex-system", title: "Codex System", version: "0.1.0" },
+      clientInfo: { name: "relay", title: "Relay", version: "0.2.0" },
       capabilities: {
         experimentalApi: true,
         requestAttestation: false,

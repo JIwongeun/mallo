@@ -13,7 +13,9 @@ const SUPPORTED_SERVER_REQUESTS = new Set([
 
 export async function readRunState(hubRoot, runId) {
   assertRunId(runId);
-  const index = await readYaml(resolve(hubRoot, ".local", "run-index", `${runId}.yaml`));
+  let index;
+  try { index = await readYaml(resolve(hubRoot, "state", "run-index", `${runId}.yaml`)); }
+  catch (error) { if (error.code === "ENOENT") index = await readYaml(resolve(hubRoot, ".local", "run-index", `${runId}.yaml`)); else throw error; }
   const state = await readYaml(resolve(index.run_root, "state.yaml"));
   return { index, state };
 }
@@ -29,12 +31,12 @@ export async function publishControl({ hubRoot, runId, type, expectedRevision = 
     validateServerResponse(state.pending_request.method, payload);
   }
   const message = { schema_version: 1, operation_id: randomUUID(), run_id: runId, type, expected_revision: revision, request_id: requestId, payload, created_at: new Date().toISOString() };
-  await writeJsonAtomic(resolve(hubRoot, ".local", "control", runId, `${message.operation_id}.json`), message);
+  await writeJsonAtomic(resolve(hubRoot, "state", "control", runId, `${message.operation_id}.json`), message);
   return message;
 }
 
 export async function consumeControl({ hubRoot, runId, currentRevision }) {
-  const root = resolve(hubRoot, ".local", "control", runId);
+  const root = resolve(hubRoot, "state", "control", runId);
   let names;
   try { names = (await readdir(root)).filter((name) => name.endsWith(".json") && !name.endsWith(".ack.json")).sort(); }
   catch (error) { if (error.code === "ENOENT") return []; throw error; }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
@@ -15,7 +15,7 @@ test("path containment rejects siblings and traversal", () => {
   assert.equal(isWithin("C:/work/app", "C:/work/app-other"), false);
 });
 
-test("registry binds only registered project roots", async () => {
+test("registry admits the selected folder without prior registration and inspect stays read-only", async () => {
   const hub = await mkdtemp(join(tmpdir(), "codex-system-바인딩-"));
   try {
     const child = join(hub, "workspace", "child project");
@@ -26,8 +26,12 @@ test("registry binds only registered project roots", async () => {
     const registered = await registry.register(child);
     const binding = await registry.resolve(child);
     assert.equal(binding.projectId, registered.project_id);
-    await assert.rejects(registry.resolve(sibling), /not a registered project/);
-    assert.match(await readFile(join(child, ".gitignore"), "utf8"), /\/\.codex-system\//);
+    const inspected = await registry.inspect(sibling);
+    assert.equal(inspected.known, false);
+    const siblingBinding = await registry.resolve(sibling);
+    assert.equal(siblingBinding.projectRoot, sibling);
+    assert.notEqual(siblingBinding.projectId, binding.projectId);
+    await assert.rejects(access(join(child, ".gitignore")), { code: "ENOENT" });
   } finally {
     await rm(hub, { recursive: true, force: true });
   }
@@ -54,6 +58,9 @@ test("git worktrees share project identity and retain their own cwd", async () =
     assert.equal(binding.projectId, first.project_id);
     assert.equal(binding.projectRoot, worktree);
     assert.equal(binding.cwd, worktree);
+    const exclude = spawnSync("git", ["-C", worktree, "rev-parse", "--path-format=absolute", "--git-path", "info/exclude"], { encoding: "utf8", windowsHide: true });
+    assert.equal(exclude.status, 0, exclude.stderr);
+    assert.match(await readFile(exclude.stdout.trim(), "utf8"), /\/\.codex-system\//);
   } finally { await rm(hub, { recursive: true, force: true }); }
 });
 

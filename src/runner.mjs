@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, realpath, lstat, readlink } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, realpath, lstat, readlink } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { AppServerClient, evaluateRequiredModels } from "./codex.mjs";
@@ -17,22 +17,24 @@ import {
   writeYamlAtomic,
 } from "./contracts.mjs";
 import { findExecutable } from "./doctor.mjs";
-import { loadRouting, routeTask } from "./router.mjs";
-import { finalizeRun, searchBrain } from "./brain.mjs";
+import { loadEffectiveRouting, routeTask } from "./router.mjs";
+import { finalizeRun, searchKnowledge } from "./knowledge.mjs";
 import { selectSkills, validateWorkerSkillDependencies } from "./catalog.mjs";
 import { assertSupportedServerRequest, consumeControl, validateServerResponse } from "./control.mjs";
 import { acquireOwnedLock, assertMaintenanceInactive, releaseOwnedLock } from "./locks.mjs";
 
 const OUTPUT_LIMIT = 100_000;
 
-export async function runManagedTask({ hubRoot, requestFile, onProgress = () => {} }) {
+export async function runManagedTask({ runtimeRoot, dataRoot, hubRoot, releaseId = "development", requestFile, onProgress = () => {} }) {
+  dataRoot ??= hubRoot;
+  runtimeRoot ??= hubRoot;
   const requestPath = resolve(requestFile);
   const request = JSON.parse(await readFile(requestPath, "utf8"));
   validateRequest(request);
-  const registry = new ProjectRegistry({ hubRoot });
+  const registry = new ProjectRegistry({ dataRoot });
   const binding = await registry.resolve(request.cwd);
   const runId = `run-${randomUUID()}`;
-  const lock = await acquireWriterLock(hubRoot, binding, runId);
+  const lock = await acquireWriterLock(dataRoot, binding, runId);
   let client;
   let controlTimer;
   try {
@@ -42,14 +44,14 @@ export async function runManagedTask({ hubRoot, requestFile, onProgress = () => 
   const startedAt = new Date().toISOString();
   const requestRevision = (request.resume_context?.request_revision ?? 0) + 1;
   await mkdir(runRoot, { recursive: true });
-  await writeYamlAtomic(resolve(hubRoot, ".local", "run-index", `${runId}.yaml`), {
+  await writeYamlAtomic(resolve(dataRoot, "state", "run-index", `${runId}.yaml`), {
     schema_version: 1, run_id: runId, project_id: binding.projectId, project_root: binding.projectRoot, run_root: runRoot,
-    resumed_from: request.resumed_from ?? null,
+    resumed_from: request.resumed_from ?? null, release_id: releaseId,
   });
   await writeYamlAtomic(taskPath, {
     schema_version: 1, run_id: runId, project_id: binding.projectId, request: request.request,
     original_request: request.original_request ?? request.request,
-    cwd: binding.cwd, scope: request.scope ?? null, exclusions: request.exclusions ?? [], explicit_skills: request.explicit_skills ?? [], criteria: [], request_revision: requestRevision,
+    cwd: binding.cwd, scope: request.scope ?? null, exclusions: request.exclusions ?? [], explicit_skills: request.explicit_skills ?? [], criteria: [], request_revision: requestRevision, release_id: releaseId,
   });
   let stateRevision = 0;
   let currentState = {
@@ -69,6 +71,7 @@ export async function runManagedTask({ hubRoot, requestFile, onProgress = () => 
     criteria_revision: request.resume_context?.criteria_revision ?? 1,
     request_revision: requestRevision,
     resumed_from: request.resumed_from ?? null,
+    release_id: releaseId,
   };
   const transition = async (workflowState, stage, extra = {}) => {
     if (control?.cancelled && workflowState === "running") throw new Error("Cancellation requested");
@@ -82,21 +85,24 @@ export async function runManagedTask({ hubRoot, requestFile, onProgress = () => 
       updated_at: new Date().toISOString(),
     });
     await writeYamlAtomic(statePath, currentState);
-    onProgress({ runId, workflowState, stage, revision: stateRevision });
+    const event = { run_id: runId, sequence: stateRevision, state_revision: stateRevision, release_id: releaseId, stage, status: workflowState, ...progressModel(stage, routing), summary: progressSummary(stage, workflowState, extra) };
+    await appendProgressEvent(dataRoot, runId, event);
+    onProgress({ runId, workflowState, stage, revision: stateRevision, event });
   };
 
   const codexPath = await findExecutable("codex", process.env.CODEX_SYSTEM_CODEX_PATH);
   if (!codexPath) throw new Error("Codex executable is unavailable");
-  const routing = await loadRouting(resolve(hubRoot, "config", "routing.yaml"));
+  const routing = await loadEffectiveRouting(resolve(runtimeRoot, "config", "routing.yaml"), resolve(dataRoot, "settings.yaml"));
+  currentState.policy_revision = createHash("sha256").update(JSON.stringify(routing)).digest("hex");
   client = new AppServerClient({ codexPath, cwd: binding.cwd, timeoutMs: 45_000, env: { ...process.env, CODEX_SYSTEM_MANAGED_RUN: "1" } });
-  const skillsConfigPath = resolve(hubRoot, "config", "skills.yaml");
+  const skillsConfigPath = resolve(runtimeRoot, "config", "skills.yaml");
   const control = { cancelled: false };
   let polling = false;
   control.poll = async () => {
     if (polling) return;
     polling = true;
     try {
-      const messages = await consumeControl({ hubRoot, runId, currentRevision: stateRevision });
+      const messages = await consumeControl({ hubRoot: dataRoot, runId, currentRevision: stateRevision });
       if (messages.some((message) => message.type === "cancel")) {
         control.cancelled = true;
         if (control.pending) {
@@ -122,11 +128,11 @@ export async function runManagedTask({ hubRoot, requestFile, onProgress = () => 
   const dispatchStage = async (args) => {
     let cards = args.selectedPatterns ?? [];
     if (retrievalInput && /^(plan|replan-|implementation|repair-)/.test(args.stage) && !args.stage.includes("review")) {
-      const retrieval = await searchBrain({ hubRoot, input: { ...retrievalInput, stage: /plan/.test(args.stage) ? "plan" : "implement" } });
+      const retrieval = await searchKnowledge({ dataRoot, input: { ...retrievalInput, stage: /plan/.test(args.stage) ? "plan" : "implement" } });
       cards = retrieval.cards;
     }
     return structuredStage({
-      ...args, selectedPatterns: cards, skillsConfigPath, control, threads, skillTask, explicitSkills: request.explicit_skills ?? [], hubRoot, runId,
+      ...args, selectedPatterns: cards, skillsConfigPath, control, threads, skillTask, explicitSkills: request.explicit_skills ?? [], hubRoot: dataRoot, runId,
       onPending: (message) => transition("needs_input", args.stage, { pending_request: pendingRequestRecord(message) }),
       onResumed: () => transition("running", args.stage, { pending_request: null }),
     });
@@ -157,7 +163,7 @@ export async function runManagedTask({ hubRoot, requestFile, onProgress = () => 
     });
     const criterionIds = new Set(triage.acceptance_criteria.map((criterion) => criterion.id));
     const route = routeTask(triage, request.request, routing);
-    await writeYamlAtomic(resolve(runRoot, "route.yaml"), { schema_version: 1, ...route });
+    await writeYamlAtomic(resolve(runRoot, "route.yaml"), { schema_version: 1, policy_revision: currentState.policy_revision, release_id: releaseId, ...route });
     retrievalInput = {
       schema_version: 1,
       project_id: binding.projectId,
@@ -170,7 +176,7 @@ export async function runManagedTask({ hubRoot, requestFile, onProgress = () => 
       exact_errors: [],
       referenced_pattern_ids: [],
     };
-    const retrieval = await searchBrain({ hubRoot, input: retrievalInput });
+    const retrieval = await searchKnowledge({ dataRoot, input: retrievalInput });
     await writeYamlAtomic(resolve(runRoot, "retrieval.yaml"), retrieval);
 
     if (route.reviewOnly) {
@@ -355,9 +361,9 @@ export async function runManagedTask({ hubRoot, requestFile, onProgress = () => 
     await writeYamlAtomic(resolve(runRoot, "learning-candidates.yaml"), {
       schema_version: 1, run_id: runId, candidates: implementation.learning_candidates,
     });
-    await verifyStageAttestations(hubRoot, runId, runRoot);
-    const brain = await finalizeRun({ hubRoot, runId });
-    await writeYamlAtomic(resolve(runRoot, "brain-finalization.yaml"), { schema_version: 1, ...brain });
+    await verifyStageAttestations(dataRoot, runId, runRoot);
+    const knowledge = await finalizeRun({ dataRoot, runId });
+    await writeYamlAtomic(resolve(runRoot, "knowledge-finalization.yaml"), { schema_version: 1, ...knowledge });
     await transition(outcome.status, "recording", { outcome: outcome.status });
     return { runId, runRoot, outcome };
   } catch (error) {
@@ -513,7 +519,7 @@ export async function loadChecks(projectRoot) {
   let config;
   try { config = JSON.parse(await readFile(configPath, "utf8")); }
   catch (error) {
-    if (error.code === "ENOENT") return { checks: [], hash: null };
+    if (error.code === "ENOENT") return deriveChecks(projectRoot);
     throw new Error(`Invalid check configuration: ${error.message}`);
   }
   if (!Array.isArray(config.checks) || config.checks.length > 20) throw new Error("Check configuration requires a bounded checks array");
@@ -525,7 +531,27 @@ export async function loadChecks(projectRoot) {
     const cwd = resolve(projectRoot, check.cwd ?? ".");
     if (!isWithin(projectRoot, await realpath(cwd))) throw new Error(`Check cwd escapes project: ${check.id}`);
   }
-  return { checks: config.checks, hash: createHash("sha256").update(await readFile(configPath)).digest("hex") };
+  return { checks: config.checks, hash: createHash("sha256").update(await readFile(configPath)).digest("hex"), source: "configured" };
+}
+
+async function deriveChecks(projectRoot) {
+  const candidates = [];
+  try {
+    const pkg = JSON.parse(await readFile(resolve(projectRoot, "package.json"), "utf8"));
+    if (pkg.scripts?.test && !/no test specified/i.test(pkg.scripts.test)) {
+      const declared = pkg.packageManager?.split("@")[0];
+      const manager = declared || (await exists(resolve(projectRoot, "pnpm-lock.yaml")) ? "pnpm" : "npm");
+      candidates.push({ id: "project-tests", argv: [manager, "test"], timeout_ms: 300_000 });
+    }
+  } catch (error) { if (error.code !== "ENOENT") throw new Error(`Invalid package.json while deriving checks: ${error.message}`); }
+  if (candidates.length === 0 && await exists(resolve(projectRoot, "Cargo.toml"))) candidates.push({ id: "cargo-tests", argv: ["cargo", "test"], timeout_ms: 300_000 });
+  if (candidates.length === 0 && (await exists(resolve(projectRoot, "pyproject.toml")) || await exists(resolve(projectRoot, "pytest.ini")))) candidates.push({ id: "python-tests", argv: ["python", "-m", "pytest"], timeout_ms: 300_000 });
+  const hash = `derived:${createHash("sha256").update(JSON.stringify(candidates)).digest("hex")}`;
+  return { checks: candidates, hash, source: candidates.length ? "derived" : "unresolved" };
+}
+
+async function exists(path) {
+  try { await readFile(path); return true; } catch (error) { if (error.code === "ENOENT") return false; throw error; }
 }
 
 export async function runChecks(projectRoot, configured, client, control, readOnly = false, protectedRoot = null) {
@@ -582,16 +608,16 @@ export async function assertProtectedRecords(runRoot, expected) {
   if (JSON.stringify(current) !== JSON.stringify(expected)) throw new Error("Managed run records changed inside an untrusted worker or check");
 }
 
-async function attestStageOutput(hubRoot, runId, runRoot, stage) {
+async function attestStageOutput(dataRoot, runId, runRoot, stage) {
   const path = resolve(runRoot, "stages", stage, "output.yaml");
   const bytes = await readFile(path);
-  await writeYamlAtomic(resolve(hubRoot, ".local", "attestations", runId, `${stage}.yaml`), {
+  await writeYamlAtomic(resolve(dataRoot, "state", "attestations", runId, `${stage}.yaml`), {
     schema_version: 1, run_id: runId, stage, source: relative(runRoot, path).replaceAll("\\", "/"), sha256: createHash("sha256").update(bytes).digest("hex"), recorded_at: new Date().toISOString(),
   });
 }
 
-async function verifyStageAttestations(hubRoot, runId, runRoot) {
-  const root = resolve(hubRoot, ".local", "attestations", runId);
+async function verifyStageAttestations(dataRoot, runId, runRoot) {
+  const root = resolve(dataRoot, "state", "attestations", runId);
   let names;
   try { names = (await readdir(root)).filter((name) => name.endsWith(".yaml")); }
   catch (error) { if (error.code === "ENOENT") throw new Error("Managed run has no controller attestations"); throw error; }
@@ -700,7 +726,7 @@ function validateRequest(request) {
 async function acquireWriterLock(hubRoot, binding, runId) {
   const identity = binding.gitCommonDir ?? binding.projectRoot;
   const name = createHash("sha256").update(identity.toLowerCase()).digest("hex").slice(0, 20);
-  const path = resolve(hubRoot, ".local", "locks", `${name}.lock`);
+  const path = resolve(hubRoot, "state", "locks", `${name}.lock`);
   await assertMaintenanceInactive(hubRoot);
   const lock = await acquireOwnedLock(path, { run_id: runId, run_started_at: new Date().toISOString(), project_id: binding.projectId }, `Project is busy or has a stale writer lock: ${path}`);
   try { await assertMaintenanceInactive(hubRoot); }
@@ -723,4 +749,30 @@ function pendingRequestRecord(message) {
 function cancelResponse(method) {
   if (method === "item/permissions/requestApproval") return { permissions: {}, scope: "turn" };
   return method === "item/tool/requestUserInput" ? { answers: {} } : { decision: "cancel" };
+}
+
+async function appendProgressEvent(dataRoot, runId, event) {
+  const path = resolve(dataRoot, "state", "events", `${runId}.jsonl`);
+  await mkdir(dirname(path), { recursive: true });
+  await appendFile(path, `${JSON.stringify(event)}\n`, "utf8");
+}
+
+function progressModel(stage, routing) {
+  if (!routing) return {};
+  if (stage === "triage") return { model: routing.models.implementation, effort: routing.effort.triage };
+  if (/plan|review/.test(stage)) return { model: routing.models.planning, effort: routing.effort.normal ?? routing.effort.complex };
+  if (/implementation|repair/.test(stage)) return { model: routing.models.implementation, effort: routing.effort.normal };
+  return {};
+}
+
+function progressSummary(stage, status, extra) {
+  if (status === "needs_input") return "Relay needs user input.";
+  if (["completed", "failed", "blocked", "cancelled"].includes(status)) return `Relay finished with status ${status}.`;
+  if (stage === "triage") return "Request classification started.";
+  if (/plan/.test(stage)) return "Plan review is in progress.";
+  if (/implementation|repair/.test(stage)) return "Implementation is in progress.";
+  if (stage === "checking") return "Configured checks are running.";
+  if (stage === "reviewing") return "Independent review is in progress.";
+  if (stage === "recording") return `Knowledge recording finished with ${extra.outcome ?? status}.`;
+  return `Relay entered ${stage}.`;
 }

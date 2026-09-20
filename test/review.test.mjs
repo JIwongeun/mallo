@@ -9,7 +9,7 @@ import { loadChecks, runChecks, outcomeFromReview, decideRecovery, projectSnapsh
 import { validateRouting, routeTask } from "../src/router.mjs";
 import { AppServerClient, defaultServerRequestResponse } from "../src/codex.mjs";
 import { ProjectRegistry } from "../src/bindings.mjs";
-import { finalizeRun, searchBrain, rebuildBrain } from "../src/brain.mjs";
+import { finalizeRun, searchKnowledge, rebuildKnowledge } from "../src/knowledge.mjs";
 
 const criteria = new Set(["boundary", "empty"]);
 const plan = () => ({ summary: "Handle inputs", assumptions: [], unresolved_questions: [], work_items: [{ id: "w", dependencies: [], files: ["index.mjs"], behavior: "Validate", criterion_ids: [...criteria], checks: ["node --test"] }] });
@@ -131,15 +131,15 @@ test("failed execution creates a provisional scoped lesson and source index exce
     await writeYamlAtomic(resolve(runRoot, "learning-candidates.yaml"), { candidates: [{ scope: "project", applies_when: "Exact boundary", recommended: "Inspect boundary test", avoid: "Repeat unchecked change", tags: ["boundary"], criterion_ids: ["boundary"] }] });
     const result = await finalizeRun({ hubRoot: root, runId });
     assert.equal(result.patterns.length, 1);
-    const path = resolve(project, ".codex-system", "patterns", `${result.patterns[0].id}.yaml`);
+    const path = resolve(root, "knowledge", "patterns", `${result.patterns[0].id}.yaml`);
     const pattern = await readYaml(path);
     assert.equal(pattern.kind, "failure_prevention"); assert.equal(pattern.status, "provisional");
     assert.equal((await finalizeRun({ hubRoot: root, runId })).patterns[0].duplicate, true);
-    for (let i = 0; i < 105; i++) await writeYamlAtomic(resolve(root, "brain", "patterns", `pattern-${String(i).padStart(3, "0")}.yaml`), { ...pattern, id: `pattern-${i}`, scope: "shared", recommended: i === 104 ? "unique-search-target" : "Some other action" });
-    const rebuilt = await rebuildBrain({ hubRoot: root }); assert.equal(rebuilt[0].patterns, 105);
+    for (let i = 0; i < 105; i++) await writeYamlAtomic(resolve(root, "knowledge", "patterns", `pattern-${String(i).padStart(3, "0")}.yaml`), { ...pattern, id: `pattern-${i}`, scope: "shared", recommended: i === 104 ? "unique-search-target" : "Some other action" });
+    const rebuilt = await rebuildKnowledge({ dataRoot: root }); assert.equal(rebuilt[0].patterns, 106);
     const query = { schema_version: 1, project_id: entry.project_id, task_summary: "unique-search-target", stage: "plan", environment: "win32" };
-    assert.ok((await searchBrain({ hubRoot: root, input: query })).cards.some((card) => card.id === "pattern-104"));
-    await writeYamlAtomic(resolve(root, "brain", "patterns", "pattern-104.yaml"), { ...pattern, id: "pattern-104", scope: "shared", recommended: "unique-search-target", environments: ["linux"] });
-    assert.ok((await searchBrain({ hubRoot: root, input: query })).cards.every((card) => card.id !== "pattern-104"));
+    assert.ok((await searchKnowledge({ dataRoot: root, input: query })).cards.some((card) => card.id === "pattern-104"));
+    await writeYamlAtomic(resolve(root, "knowledge", "patterns", "pattern-104.yaml"), { ...pattern, id: "pattern-104", scope: "shared", recommended: "unique-search-target", environments: ["linux"] });
+    assert.ok((await searchKnowledge({ dataRoot: root, input: query })).cards.every((card) => card.id !== "pattern-104"));
   } finally { await rm(root, { recursive: true, force: true }); }
 });

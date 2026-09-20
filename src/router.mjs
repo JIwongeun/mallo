@@ -8,6 +8,22 @@ export async function loadRouting(path) {
   return validateRouting(config);
 }
 
+export async function loadEffectiveRouting(defaultPath, settingsPath) {
+  const defaults = await loadRouting(defaultPath);
+  let settings;
+  try { settings = await readYaml(settingsPath); }
+  catch (error) { if (error.code === "ENOENT") return defaults; throw error; }
+  if (settings?.schema_version !== 1) throw new Error("Unsupported Relay settings schema");
+  const allowed = new Set(["schema_version", "routing"]);
+  for (const key of Object.keys(settings)) if (!allowed.has(key)) throw new Error(`Unknown Relay setting: ${key}`);
+  const override = settings.routing ?? {};
+  return validateRouting({
+    ...defaults,
+    effort: { ...defaults.effort, ...(override.effort ?? {}) },
+    limits: { ...defaults.limits, ...(override.limits ?? {}) },
+  });
+}
+
 export function validateRouting(config) {
   if (config?.models?.planning !== "gpt-6-astra" || config?.models?.implementation !== "gpt-5.6-sol") throw new Error("Routing requires Astra planning and Sol implementation");
   if (config.effort?.triage !== "medium" || config.effort?.normal !== "high" || config.effort?.complex !== "xhigh") throw new Error("Routing efforts must be medium/high/xhigh");

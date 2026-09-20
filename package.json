@@ -1,6 +1,6 @@
 {
   "name": "codex-system",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -14,7 +14,8 @@
     "install:integration": "node src/cli.mjs install",
     "uninstall:integration": "node src/cli.mjs uninstall",
     "test": "node --test \"test/*.test.mjs\"",
-    "test:live": "node src/cli.mjs smoke dispatch --write-evidence"
+    "test:live": "node src/cli.mjs smoke dispatch --write-evidence",
+    "release:build": "node src/cli.mjs release build --ref HEAD"
   },
   "dependencies": {
     "yaml": "2.8.1"

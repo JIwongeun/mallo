@@ -9,6 +9,7 @@ const MAX_REQUEST = 100_000;
 const MAX_OUTPUT = 1_000_000;
 const activeByCall = new Map();
 const activeByRun = new Map();
+let pinnedPointer;
 
 const requestProperties = {
   request: { type: "string", minLength: 1, maxLength: MAX_REQUEST },
@@ -21,7 +22,7 @@ const requestProperties = {
 const tools = [
   {
     name: "start_managed_task",
-    description: "Start one registered-project request through Codex System and return its run ID. Use the exact user message, normalized project task, and current cwd.",
+    description: "Start one current-folder request through Relay and return its run ID. Use the exact user message, normalized project task, and current cwd.",
     inputSchema: { type: "object", properties: requestProperties, required: ["request", "original_request", "cwd"], additionalProperties: false },
     annotations: { destructiveHint: false, openWorldHint: false },
   },
@@ -67,7 +68,7 @@ async function handle(message) {
     if (message.method === "initialize") return send(message.id, {
       protocolVersion: message.params?.protocolVersion ?? "2024-11-05",
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "codex-system", version: "0.1.1" },
+      serverInfo: { name: "codex-system", version: "0.2.0" },
     });
     if (message.method === "ping") return send(message.id, {});
     if (message.method === "tools/list") return send(message.id, { tools });
@@ -90,7 +91,7 @@ async function callTool(callId, params) {
 async function startTask(callId, input) {
   validateStart(input);
   const pointer = await readPointer();
-  const requestPath = resolve(pointer.hub_root, ".local", "mcp-requests", `${randomUUID()}.json`);
+  const requestPath = resolve(pointer.data_root, "state", "mcp-requests", `${randomUUID()}.json`);
   await mkdir(dirname(requestPath), { recursive: true });
   await writeFile(requestPath, `${JSON.stringify({ schema_version: 1, request: input.request, original_request: input.original_request, cwd: resolve(input.cwd), explicit_skills: input.explicit_skills ?? [], client: { kind: "codex-skill", session_id: input.session_id ?? null } }, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
   const run = spawnRunner(pointer, ["run", "--request-file", requestPath], callId, requestPath);
@@ -111,9 +112,9 @@ async function awaitTask(input) {
   if (timeoutMs < 0 || timeoutMs > 30_000) throw new Error("timeout_ms must be between 0 and 30000");
   const run = activeByRun.get(input.run_id);
   if (run && !run.done && timeoutMs > 0) await Promise.race([run.finished, delay(timeoutMs)]);
-  const status = await runCli(["status", "--run-id", input.run_id]);
+  const status = await runCli(["status", "--run-id", input.run_id, "--after-sequence", String(input.after_revision ?? 0)]);
   const afterRevision = Number.isInteger(input.after_revision) ? input.after_revision : 0;
-  const progress = run?.progress.filter((event) => !Number.isInteger(event.revision) || event.revision > afterRevision).slice(-20) ?? [];
+  const progress = status.events ?? run?.progress.filter((event) => !Number.isInteger(event.revision) || event.revision > afterRevision).slice(-20) ?? [];
   return { ...status, progress, next_revision: status.state?.revision ?? afterRevision };
 }
 
@@ -122,7 +123,7 @@ async function controlTask(type, input) {
   if (type === "cancel") return runCli(["cancel", "--run-id", input.run_id]);
   if (typeof input.request_id !== "string" || !input.request_id) throw new Error("request_id is required");
   const pointer = await readPointer();
-  const responsePath = resolve(pointer.hub_root, ".local", "mcp-responses", `${randomUUID()}.json`);
+  const responsePath = resolve(pointer.data_root, "state", "mcp-responses", `${randomUUID()}.json`);
   await mkdir(dirname(responsePath), { recursive: true });
   await writeFile(responsePath, `${JSON.stringify(input.payload)}\n`, { encoding: "utf8", flag: "wx" });
   try { return await runCli(["respond", "--run-id", input.run_id, "--request-id", input.request_id, "--file", responsePath]); }
@@ -130,7 +131,7 @@ async function controlTask(type, input) {
 }
 
 function spawnRunner(pointer, cliArgs, callId, requestPath) {
-  const child = spawn(pointer.node_path, [pointer.cli_path, ...cliArgs], { cwd: pointer.hub_root, env: process.env, shell: false, windowsHide: true });
+  const child = spawn(pointer.node_path, [pointer.cli_path, ...cliArgs], { cwd: pointer.runtime_root, env: { ...process.env, CODEX_SYSTEM_DATA_ROOT: pointer.data_root }, shell: false, windowsHide: true });
   activeByCall.set(String(callId), child);
   const run = { child, stdout: "", stderr: "", lineBuffer: "", progress: [], done: false };
   let resolveStarted;
@@ -170,7 +171,7 @@ function spawnRunner(pointer, cliArgs, callId, requestPath) {
 async function runCli(args) {
   const pointer = await readPointer();
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(pointer.node_path, [pointer.cli_path, ...args], { cwd: pointer.hub_root, env: process.env, shell: false, windowsHide: true });
+    const child = spawn(pointer.node_path, [pointer.cli_path, ...args], { cwd: pointer.runtime_root, env: { ...process.env, CODEX_SYSTEM_DATA_ROOT: pointer.data_root }, shell: false, windowsHide: true });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => { stopChild(child); rejectPromise(new Error("Control command timed out")); }, 15_000);
@@ -187,11 +188,14 @@ async function runCli(args) {
 }
 
 async function readPointer() {
+  if (pinnedPointer) return pinnedPointer;
   const pointerPath = resolve(process.env.CODEX_HOME || resolve(homedir(), ".codex"), "codex-system.json");
   const pointer = JSON.parse(await readFile(pointerPath, "utf8"));
-  if (pointer.schema_version !== 1 || !isAbsolute(pointer.hub_root) || !isAbsolute(pointer.node_path) || !isAbsolute(pointer.cli_path)) throw new Error("Invalid Codex System pointer");
-  await Promise.all([access(pointer.node_path), access(pointer.cli_path)]);
-  return pointer;
+  const normalized = { ...pointer, runtime_root: pointer.runtime_root ?? pointer.hub_root, data_root: pointer.data_root ?? pointer.hub_root, release_id: pointer.release_id ?? "legacy-0.1.1" };
+  if (![1, 2].includes(normalized.schema_version) || !isAbsolute(normalized.runtime_root) || !isAbsolute(normalized.data_root) || !isAbsolute(normalized.node_path) || !isAbsolute(normalized.cli_path) || typeof normalized.release_id !== "string") throw new Error("Invalid Relay pointer");
+  await Promise.all([access(normalized.node_path), access(normalized.cli_path), access(normalized.runtime_root), access(normalized.data_root)]);
+  pinnedPointer = normalized;
+  return normalized;
 }
 
 function validateStart(input) {
