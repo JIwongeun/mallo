@@ -62,11 +62,13 @@ test("check configuration is fixed before workers run and execution uses native 
     const client = { executeCommand: async (args) => { seen.push(args); return { exitCode: 0, stdout: "ok", stderr: "" }; }, terminateCommand: async () => {} };
     const control = { cancelled: false, poll: async () => {} };
     assert.equal((await runChecks(root, snapshot, client, control))[0].status, "passed");
-    assert.deepEqual(seen[0].sandboxPolicy.writableRoots, [root]);
+    assert.deepEqual(seen[0].sandboxPolicy.writableRoots, [root, seen[0].env.TEMP]);
     assert.equal(seen[0].sandboxPolicy.networkAccess, false);
     assert.equal(seen[0].sandboxPolicy.excludeTmpdirEnvVar, false);
     assert.equal(seen[0].env.TEMP, seen[0].env.TMP);
     assert.match(seen[0].env.TEMP, /\.codex-system[\\/]tmp[\\/]check-/);
+    assert.equal(seen[0].env.CODEX_SYSTEM_MANAGED_RUN, null);
+    assert.equal(seen[0].env.CODEX_SYSTEM_DATA_ROOT, null);
     config.checks[0].argv = ["node", "-e", "console.log('forged')"];
     await writeFile(path, JSON.stringify(config));
     assert.equal((await runChecks(root, snapshot, client, control))[0].status, "blocked");

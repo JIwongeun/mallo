@@ -181,7 +181,7 @@ export async function runManagedTask({ runtimeRoot, dataRoot, hubRoot, releaseId
 
     if (route.reviewOnly) {
       await transition("running", "checking", { route: route.route });
-      const checks = await runChecks(binding.projectRoot, configuredChecks, client, control, true, runRoot);
+      const checks = await runChecks(binding.projectRoot, configuredChecks, client, control, true, runRoot, resolve(dataRoot, "state", "tmp", "checks", runId));
       for (const check of checks) evidence.add(`check:${check.id}`);
       await writeYamlAtomic(resolve(runRoot, "checks", "1.yaml"), { schema_version: 1, attempt: 1, checks });
       await transition("running", "reviewing", { route: route.route });
@@ -312,7 +312,7 @@ export async function runManagedTask({ runtimeRoot, dataRoot, hubRoot, releaseId
       evidence.add(`stage:${stage}`);
 
       await transition("running", "checking", { route: route.route, repair_attempt: repairAttempt, replan_attempt: replanAttempt });
-      checks = await runChecks(binding.projectRoot, configuredChecks, client, control, false, runRoot);
+      checks = await runChecks(binding.projectRoot, configuredChecks, client, control, false, runRoot, resolve(dataRoot, "state", "tmp", "checks", runId));
       for (const check of checks) evidence.add(`check:${check.id}`);
       await writeYamlAtomic(resolve(runRoot, "checks", `${repairAttempt + 1}.yaml`), { schema_version: 1, attempt: repairAttempt + 1, checks });
 
@@ -575,7 +575,7 @@ async function exists(path) {
   try { await readFile(path); return true; } catch (error) { if (error.code === "ENOENT") return false; throw error; }
 }
 
-export async function runChecks(projectRoot, configured, client, control, readOnly = false, protectedRoot = null) {
+export async function runChecks(projectRoot, configured, client, control, readOnly = false, protectedRoot = null, tempBase = resolve(projectRoot, ".codex-system", "tmp")) {
   const current = await loadChecks(projectRoot);
   if (current.hash !== configured.hash) return [{ id: "check-config-integrity", status: "blocked", output: "Check configuration changed during execution; review it before starting a new run" }];
   const results = [];
@@ -587,7 +587,7 @@ export async function runChecks(projectRoot, configured, client, control, readOn
     const argv = [...check.argv];
     if (argv[0] === "node") argv[0] = process.execPath;
     const processId = `check-${randomUUID()}`;
-    const tempRoot = resolve(projectRoot, ".codex-system", "tmp", processId);
+    const tempRoot = resolve(tempBase, processId);
     await mkdir(tempRoot, { recursive: true });
     const started = Date.now();
     control.stop = () => client.terminateCommand(processId);
@@ -596,8 +596,8 @@ export async function runChecks(projectRoot, configured, client, control, readOn
     try {
       const result = await client.executeCommand({
         argv, cwd, processId, timeoutMs: base.timeout_ms,
-        env: { TEMP: tempRoot, TMP: tempRoot, TMPDIR: tempRoot },
-        sandboxPolicy: { type: "workspaceWrite", writableRoots: readOnly ? [tempRoot] : [projectRoot], networkAccess: false, excludeTmpdirEnvVar: false, excludeSlashTmp: true },
+        env: { TEMP: tempRoot, TMP: tempRoot, TMPDIR: tempRoot, CODEX_SYSTEM_MANAGED_RUN: null, CODEX_SYSTEM_DATA_ROOT: null },
+        sandboxPolicy: { type: "workspaceWrite", writableRoots: readOnly ? [tempRoot] : [projectRoot, tempRoot], networkAccess: false, excludeTmpdirEnvVar: false, excludeSlashTmp: true },
       });
       results.push({ ...base, status: result.exitCode === 0 ? "passed" : "failed", exit_code: result.exitCode, duration_ms: Date.now() - started, output: `${result.stdout}\n${result.stderr}`.slice(-OUTPUT_LIMIT) });
     } catch (error) {
