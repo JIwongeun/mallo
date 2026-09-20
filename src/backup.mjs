@@ -6,11 +6,11 @@ import { rebuildKnowledge } from "./knowledge.mjs";
 import { acquireOwnedLock, releaseOwnedLock } from "./locks.mjs";
 
 export async function exportBackup({ hubRoot: dataRoot, destination }) {
-  const maintenance = await acquireOwnedLock(resolve(dataRoot, "state", "maintenance.lock"), { operation: "backup-export" }, "Relay maintenance is already active");
+  const maintenance = await acquireOwnedLock(resolve(dataRoot, "state", "maintenance.lock"), { operation: "backup-export" }, "Mallo maintenance is already active");
   try {
     await assertQuiescent(dataRoot);
     const root = resolve(destination);
-    if (isWithin(dataRoot, root)) throw new Error("Backup destination must be outside Relay data");
+    if (isWithin(dataRoot, root)) throw new Error("Backup destination must be outside Mallo data");
     await mkdir(root, { recursive: true });
     if ((await readdir(root)).length) throw new Error("Backup destination must be empty");
     const items = [];
@@ -25,7 +25,7 @@ export async function exportBackup({ hubRoot: dataRoot, destination }) {
 }
 
 export async function importBackup({ hubRoot: dataRoot, source }) {
-  const maintenance = await acquireOwnedLock(resolve(dataRoot, "state", "maintenance.lock"), { operation: "backup-import" }, "Relay maintenance is already active");
+  const maintenance = await acquireOwnedLock(resolve(dataRoot, "state", "maintenance.lock"), { operation: "backup-import" }, "Mallo maintenance is already active");
   try {
     await assertQuiescent(dataRoot);
     const root = await realpath(resolve(source));

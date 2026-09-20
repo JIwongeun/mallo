@@ -13,9 +13,9 @@ export async function loadEffectiveRouting(defaultPath, settingsPath) {
   let settings;
   try { settings = await readYaml(settingsPath); }
   catch (error) { if (error.code === "ENOENT") return defaults; throw error; }
-  if (settings?.schema_version !== 1) throw new Error("Unsupported Relay settings schema");
+  if (settings?.schema_version !== 1) throw new Error("Unsupported Mallo settings schema");
   const allowed = new Set(["schema_version", "routing"]);
-  for (const key of Object.keys(settings)) if (!allowed.has(key)) throw new Error(`Unknown Relay setting: ${key}`);
+  for (const key of Object.keys(settings)) if (!allowed.has(key)) throw new Error(`Unknown Mallo setting: ${key}`);
   const override = settings.routing ?? {};
   return validateRouting({
     ...defaults,

@@ -1,16 +1,16 @@
 {
   "name": "codex-system",
-  "version": "0.2.0+codex.20260920102817",
+  "version": "0.2.1+codex.20260920113744",
   "mcpServers": "./.mcp.json",
-  "description": "Plans, builds, verifies, and remembers work in the current folder with Astra and Sol.",
+  "description": "A small, formless companion that adapts through verified lessons from the user's work.",
   "author": {
     "name": "Local developer"
   },
   "skills": "./skills/",
   "interface": {
-    "displayName": "Relay",
-    "shortDescription": "Plan, build, verify, remember",
-    "longDescription": "Routes current-folder work through Astra planning and review, Sol implementation, verified checks, and independent reusable Knowledge.",
+    "displayName": "Mallo",
+    "shortDescription": "Adapts through verified work lessons",
+    "longDescription": "Mallo is a small, formless companion that adapts to the user through verified lessons from their work.",
     "developerName": "Local developer",
     "category": "Productivity",
     "capabilities": [
@@ -19,12 +19,12 @@
       "Local execution"
     ],
     "defaultPrompt": [
-      "Use Relay for this project task.",
-      "Show the latest Relay run status."
+      "Use Mallo for this project task.",
+      "Show the latest Mallo run status."
     ],
     "brandColor": "#6366F1",
-    "composerIcon": "./assets/relay-icon.png",
-    "logo": "./assets/relay-logo.png",
-    "logoDark": "./assets/relay-logo-dark.png"
+    "composerIcon": "./assets/mallo.png",
+    "logo": "./assets/mallo.png",
+    "logoDark": "./assets/mallo.png"
   }
 }

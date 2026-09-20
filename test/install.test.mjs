@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { uninstallIntegration } from "../src/install.mjs";
 import { spawnSync } from "node:child_process";
 
-test("uninstall removes only Relay integration and preserves personal data", async () => {
+test("uninstall removes only Mallo integration and preserves personal data", async () => {
   const root = await mkdtemp(join(tmpdir(), "relay-uninstall-"));
   const previousHome = process.env.CODEX_HOME;
   const previousExecutable = process.env.CODEX_SYSTEM_CODEX_PATH;

@@ -57,7 +57,7 @@ export class AppServerClient extends EventEmitter {
     });
 
     const response = await this.request("initialize", {
-      clientInfo: { name: "relay", title: "Relay", version: "0.2.0" },
+      clientInfo: { name: "mallo", title: "Mallo", version: "0.2.1" },
       capabilities: {
         experimentalApi: true,
         requestAttestation: false,

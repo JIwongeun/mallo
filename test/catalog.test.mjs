@@ -1,9 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { discoverSkills, selectSkills } from "../src/catalog.mjs";
+
+test("Mallo entry skill is excluded from worker selection by public and source identities", async () => {
+  const root = await mkdtemp(join(tmpdir(), "codex-system-mallo-exclusion-"));
+  try {
+    const configPath = join(root, "skills.yaml");
+    const path = resolve("plugins/codex-system/skills/mallo/SKILL.md");
+    await writeFile(configPath, "schema_version: 2\ndisabled:\n  - codex-system:mallo\n  - plugin:codex-system:skills/mallo\nmandatory: []\npreferences: []\nlimits:\n  per_stage: 2\n");
+    const client = { listSkills: async () => [{ skills: [
+      { name: "codex-system:mallo", description: "Mallo entry", path, enabled: true, pluginId: null },
+      { name: "mallo", description: "Mallo entry", path, enabled: true, pluginId: "codex-system" },
+    ] }] };
+    const selected = await selectSkills({ client, cwd: root, stage: "implementation", configPath, task: { request: "Use Mallo for this task" } });
+    assert.equal(selected.length, 0);
+    await assert.rejects(selectSkills({ client, cwd: root, stage: "implementation", configPath, explicitIds: ["codex-system:mallo"] }), /Explicit skill unavailable/);
+    await assert.rejects(selectSkills({ client, cwd: root, stage: "implementation", configPath, explicitIds: ["plugin:codex-system:skills/mallo"] }), /Explicit skill unavailable/);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
 
 test("catalog refreshes changes and blocks missing mandatory skills", async () => {
   const root = await mkdtemp(join(tmpdir(), "codex-system-catalog-"));

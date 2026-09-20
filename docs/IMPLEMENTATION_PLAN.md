@@ -2,6 +2,8 @@
 
 Status: **implemented, installed and accepted**, revised 2026-09-20. R0-R8 replace the earlier hub/workspace plan. The completed M0-M7 release remains a historical baseline. Current evidence is summarized in section 8 and the ignored `.local/implementation-evidence/release-vnext.json` record.
 
+> Version 0.2.1 adopts the public name **Mallo** and the approved amorphous slime mascot; the R0-R8 material below remains historical evidence.
+
 ## 1. Required outcome and agreed scope
 
 The user opens any local project folder in Codex, including this framework's source repository, and requests work normally. The installed plugin identifies that folder, selects installed skills and Astra/Sol stages, reports meaningful progress, executes checks, and captures reusable lessons in an independent personal Knowledge store. The development repository need not be attached, present at its original path, or accessible to ordinary project workers.

@@ -22,7 +22,7 @@ const requestProperties = {
 const tools = [
   {
     name: "start_managed_task",
-    description: "Start one current-folder request through Relay and return its run ID. Use the exact user message, normalized project task, and current cwd.",
+    description: "Start one current-folder request through Mallo and return its run ID. Use the exact user message, normalized project task, and current cwd.",
     inputSchema: { type: "object", properties: requestProperties, required: ["request", "original_request", "cwd"], additionalProperties: false },
     annotations: { destructiveHint: false, openWorldHint: false },
   },
@@ -68,7 +68,7 @@ async function handle(message) {
     if (message.method === "initialize") return send(message.id, {
       protocolVersion: message.params?.protocolVersion ?? "2024-11-05",
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "codex-system", version: "0.2.0" },
+      serverInfo: { name: "codex-system", version: "0.2.1" },
     });
     if (message.method === "ping") return send(message.id, {});
     if (message.method === "tools/list") return send(message.id, { tools });
@@ -192,7 +192,7 @@ async function readPointer() {
   const pointerPath = resolve(process.env.CODEX_HOME || resolve(homedir(), ".codex"), "codex-system.json");
   const pointer = JSON.parse(await readFile(pointerPath, "utf8"));
   const normalized = { ...pointer, runtime_root: pointer.runtime_root ?? pointer.hub_root, data_root: pointer.data_root ?? pointer.hub_root, release_id: pointer.release_id ?? "legacy-0.1.1" };
-  if (![1, 2].includes(normalized.schema_version) || !isAbsolute(normalized.runtime_root) || !isAbsolute(normalized.data_root) || !isAbsolute(normalized.node_path) || !isAbsolute(normalized.cli_path) || typeof normalized.release_id !== "string") throw new Error("Invalid Relay pointer");
+  if (![1, 2].includes(normalized.schema_version) || !isAbsolute(normalized.runtime_root) || !isAbsolute(normalized.data_root) || !isAbsolute(normalized.node_path) || !isAbsolute(normalized.cli_path) || typeof normalized.release_id !== "string") throw new Error("Invalid Mallo pointer");
   await Promise.all([access(normalized.node_path), access(normalized.cli_path), access(normalized.runtime_root), access(normalized.data_root)]);
   pinnedPointer = normalized;
   return normalized;

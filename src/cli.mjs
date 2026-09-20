@@ -165,7 +165,7 @@ async function hookContext(args) {
       systemMessage: "RELAY:AVAILABLE",
       hookSpecificOutput: {
         hookEventName: "SessionStart",
-        additionalContext: `Relay is available for the current folder (${binding.projectId}). Use the relay skill for implementation, fixes, planning, or verification. Skip it for informational questions. Never select a sibling folder.`,
+        additionalContext: `Mallo is available for the current folder (${binding.projectId}). Use the mallo skill for implementation, fixes, planning, or verification. Skip it for informational questions. Never select a sibling folder.`,
       },
     }));
   } catch {

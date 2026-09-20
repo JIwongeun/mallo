@@ -1,6 +1,6 @@
 # Repository rules
 
-- This repository is the development source of the personal Relay orchestration plugin. Relay supports arbitrary local project folders, including this repository; do not require a parent hub, `workspace/`, or a secondary folder.
+- This repository is the development source of the personal Mallo orchestration plugin. Mallo supports arbitrary local project folders, including this repository; do not require a parent hub, `workspace/`, or a secondary folder.
 - Treat the task's primary working folder as the default target. Shared entry uses the installed plugin, not parent-repository inheritance or prior registration.
 - Store project code, requirements, plans, run records, test evidence, and project-specific memory inside that project. Use `.codex-system/` for internal execution records.
 - Keep immutable executable pipelines/defaults in the installed release and personal data outside the development checkout. The target reusable store is Knowledge under the user's data root. Generalize lessons and retain compact evidence snapshots; original project/run paths are optional provenance, never dependencies of admitted knowledge. Do not copy whole project data.

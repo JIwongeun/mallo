@@ -1,10 +1,37 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cp, mkdir, mkdtemp, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, mkdtemp, readFile, rename, rm, unlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { buildRelease, inspectRelease, promoteRelease, rollbackRelease } from "../src/release.mjs";
+
+test("Mallo branding, entry skill, assets, and versions stay consistent", async () => {
+  const manifest = JSON.parse(await readFile(resolve("plugins/codex-system/.codex-plugin/plugin.json"), "utf8"));
+  const packageJson = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  const skill = await readFile(resolve("plugins/codex-system/skills/mallo/SKILL.md"), "utf8");
+  const hooks = await readFile(resolve("plugins/codex-system/hooks/hooks.json"), "utf8");
+  const config = await readFile(resolve("config/skills.yaml"), "utf8");
+  const readme = await readFile(resolve("README.md"), "utf8");
+  const server = await readFile(resolve("plugins/codex-system/server.mjs"), "utf8");
+  const client = await readFile(resolve("src/codex.mjs"), "utf8");
+  const mascot = await readFile(resolve("plugins/codex-system/assets/mallo.png"));
+  assert.equal(packageJson.version, "0.2.1");
+  assert.equal(manifest.version.split("+")[0], "0.2.1");
+  assert.equal(manifest.interface.displayName, "Mallo");
+  assert.match(manifest.description, /small, formless companion.*verified lessons/);
+  assert.deepEqual([manifest.interface.composerIcon, manifest.interface.logo, manifest.interface.logoDark], Array(3).fill("./assets/mallo.png"));
+  assert.equal(createHash("sha256").update(mascot).digest("hex").toUpperCase(), "E6119BD24978C2D32DE0C8E643B47546C2B0B6ECC785C39A8DC07FA58A8BE4B9");
+  assert.match(skill, /^name: mallo$/m);
+  assert.match(hooks, /Checking Mallo availability/);
+  assert.match(config, /codex-system:mallo/);
+  assert.match(config, /plugin:codex-system:skills\/mallo/);
+  assert.match(readme, /^경험을 먹고, 당신에게 맞춰지는 작은 생물\.$/m);
+  assert.match(server, /serverInfo: \{ name: "codex-system", version: "0\.2\.1" \}/);
+  assert.match(client, /clientInfo: \{ name: "mallo", title: "Mallo", version: "0\.2\.1" \}/);
+  for (const obsolete of ["plugins/codex-system/skills/relay/SKILL.md", "plugins/codex-system/assets/relay-icon.png", "plugins/codex-system/assets/relay-logo.png", "plugins/codex-system/assets/relay-logo-dark.png"]) await assert.rejects(access(resolve(obsolete)));
+});
 
 test("release build uses an exact clean commit and detects tampering", async () => {
   const root = await mkdtemp(join(tmpdir(), "relay-release-build-"));
@@ -30,6 +57,8 @@ test("release build uses an exact clean commit and detects tampering", async () 
     });
     assert.equal(startup.status, 0, startup.stderr);
     assert.match(startup.stdout, /RELAY:AVAILABLE/);
+    assert.match(startup.stdout, /Mallo is available/);
+    assert.match(startup.stdout, /mallo skill/);
     await rename(unavailable, source);
     await writeFile(resolve(built.runtime_root, "config", "routing.yaml"), "tampered: true\n");
     await assert.rejects(inspectRelease({ runtimeRoot: built.runtime_root }), /integrity/);
@@ -78,7 +107,7 @@ test("promotion records the previous release and rollback preserves Knowledge", 
     const calls = [];
     const runCommand = (executable, args) => {
       calls.push({ executable, args });
-      if (args[0] === "plugin") return { status: 0, stdout: JSON.stringify({ version: "0.2.0", installedPath: resolve(root, "cache") }), stderr: "" };
+      if (args[0] === "plugin") return { status: 0, stdout: JSON.stringify({ version: "0.2.1", installedPath: resolve(root, "cache") }), stderr: "" };
       return { status: 0, stdout: '{"systemMessage":"RELAY:AVAILABLE"}', stderr: "" };
     };
     const promoted = await promoteRelease({ sourceRoot: source, dataRoot: data, runtimeRoot: built.runtime_root, runCommand });

@@ -54,7 +54,7 @@ export async function assertMaintenanceInactive(hubRoot) {
   for (const path of [resolve(hubRoot, "state", "maintenance.lock"), resolve(hubRoot, ".local", "maintenance.lock")]) {
     try {
       await access(path);
-      throw new Error(`Relay maintenance is active: ${path}`);
+      throw new Error(`Mallo maintenance is active: ${path}`);
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }

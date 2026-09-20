@@ -1,6 +1,7 @@
 schema_version: 2
 disabled:
-  - codex-system:codex-system
+  - codex-system:mallo
+  - plugin:codex-system:skills/mallo
 explicit_only:
   - ask-matt
   - autoplan

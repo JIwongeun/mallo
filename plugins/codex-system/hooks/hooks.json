@@ -8,7 +8,7 @@
             "type": "command",
             "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context.ps1\"",
             "timeout": 5,
-            "statusMessage": "Checking Relay availability..."
+            "statusMessage": "Checking Mallo availability..."
           }
         ]
       }

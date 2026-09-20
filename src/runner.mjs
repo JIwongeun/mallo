@@ -794,13 +794,13 @@ function progressModel(stage, routing) {
 }
 
 function progressSummary(stage, status, extra) {
-  if (status === "needs_input") return "Relay needs user input.";
-  if (["completed", "failed", "blocked", "cancelled"].includes(status)) return `Relay finished with status ${status}.`;
+  if (status === "needs_input") return "Mallo needs user input.";
+  if (["completed", "failed", "blocked", "cancelled"].includes(status)) return `Mallo finished with status ${status}.`;
   if (stage === "triage") return "Request classification started.";
   if (/plan/.test(stage)) return "Plan review is in progress.";
   if (/implementation|repair/.test(stage)) return "Implementation is in progress.";
   if (stage === "checking") return "Configured checks are running.";
   if (stage === "reviewing") return "Independent review is in progress.";
   if (stage === "recording") return `Knowledge recording finished with ${extra.outcome ?? status}.`;
-  return `Relay entered ${stage}.`;
+  return `Mallo entered ${stage}.`;
 }

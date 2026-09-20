@@ -15,7 +15,7 @@ export async function uninstallIntegration(_sourceRoot, { dataRoot, runCommand =
   const pointerPath = relayPointerPath();
   let pointer = null;
   try { pointer = JSON.parse(await readFile(pointerPath, "utf8")); } catch (error) { if (error.code !== "ENOENT") throw error; }
-  if (pointer && resolve(pointer.data_root ?? pointer.hub_root) !== resolve(dataRoot)) throw new Error("Relay pointer is not owned by this data root");
+  if (pointer && resolve(pointer.data_root ?? pointer.hub_root) !== resolve(dataRoot)) throw new Error("Mallo pointer is not owned by this data root");
   const codexPath = await findExecutable("codex", process.env.CODEX_SYSTEM_CODEX_PATH);
   if (!codexPath) throw new Error("Codex executable is unavailable");
   const inventory = JSON.parse(runCommand(codexPath, ["plugin", "list", "--json"]).stdout);
