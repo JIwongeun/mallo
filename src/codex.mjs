@@ -293,8 +293,8 @@ export class AppServerClient extends EventEmitter {
     return this.request("turn/interrupt", { threadId, turnId });
   }
 
-  executeCommand({ argv, cwd, timeoutMs, sandboxPolicy, processId }) {
-    return this.request("command/exec", { command: argv, cwd, timeoutMs, sandboxPolicy, processId, ...(process.platform === "win32" ? {} : { outputBytesCap: 100_000 }) }, { timeoutMs: timeoutMs + 10_000 });
+  executeCommand({ argv, cwd, env, timeoutMs, sandboxPolicy, processId }) {
+    return this.request("command/exec", { command: argv, cwd, env, timeoutMs, sandboxPolicy, processId, ...(process.platform === "win32" ? {} : { outputBytesCap: 100_000 }) }, { timeoutMs: timeoutMs + 10_000 });
   }
 
   terminateCommand(processId) {

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { appendFile, mkdir, readFile, readdir, realpath, lstat, readlink } from "node:fs/promises";
+import { appendFile, mkdir, readFile, readdir, realpath, lstat, readlink, rm } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { AppServerClient, evaluateRequiredModels } from "./codex.mjs";
@@ -587,18 +587,25 @@ export async function runChecks(projectRoot, configured, client, control, readOn
     const argv = [...check.argv];
     if (argv[0] === "node") argv[0] = process.execPath;
     const processId = `check-${randomUUID()}`;
+    const tempRoot = resolve(projectRoot, ".codex-system", "tmp", processId);
+    await mkdir(tempRoot, { recursive: true });
     const started = Date.now();
     control.stop = () => client.terminateCommand(processId);
     const base = { id: check.id, argv, cwd, executor: "codex-command/exec", timeout_ms: check.timeout_ms ?? 60_000 };
     const protectedRecords = protectedRoot ? await snapshotProtectedRecords(protectedRoot) : null;
     try {
-      const result = await client.executeCommand({ argv, cwd, processId, timeoutMs: base.timeout_ms, sandboxPolicy: readOnly ? { type: "readOnly", networkAccess: false } : { type: "workspaceWrite", writableRoots: [projectRoot], networkAccess: false, excludeTmpdirEnvVar: true, excludeSlashTmp: true } });
+      const result = await client.executeCommand({
+        argv, cwd, processId, timeoutMs: base.timeout_ms,
+        env: { TEMP: tempRoot, TMP: tempRoot, TMPDIR: tempRoot },
+        sandboxPolicy: { type: "workspaceWrite", writableRoots: readOnly ? [tempRoot] : [projectRoot], networkAccess: false, excludeTmpdirEnvVar: false, excludeSlashTmp: true },
+      });
       results.push({ ...base, status: result.exitCode === 0 ? "passed" : "failed", exit_code: result.exitCode, duration_ms: Date.now() - started, output: `${result.stdout}\n${result.stderr}`.slice(-OUTPUT_LIMIT) });
     } catch (error) {
       await client.terminateCommand(processId).catch(() => {});
       results.push({ ...base, status: "blocked", exit_code: null, duration_ms: Date.now() - started, output: error.message });
     } finally {
       control.stop = null;
+      await rm(tempRoot, { recursive: true, force: true });
       if (protectedRecords) await assertProtectedRecords(protectedRoot, protectedRecords);
     }
     if (control.cancelled) throw new Error("Cancellation requested");

@@ -64,6 +64,9 @@ test("check configuration is fixed before workers run and execution uses native 
     assert.equal((await runChecks(root, snapshot, client, control))[0].status, "passed");
     assert.deepEqual(seen[0].sandboxPolicy.writableRoots, [root]);
     assert.equal(seen[0].sandboxPolicy.networkAccess, false);
+    assert.equal(seen[0].sandboxPolicy.excludeTmpdirEnvVar, false);
+    assert.equal(seen[0].env.TEMP, seen[0].env.TMP);
+    assert.match(seen[0].env.TEMP, /\.codex-system[\\/]tmp[\\/]check-/);
     config.checks[0].argv = ["node", "-e", "console.log('forged')"];
     await writeFile(path, JSON.stringify(config));
     assert.equal((await runChecks(root, snapshot, client, control))[0].status, "blocked");
