@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose an improvement within Mallo's two-feature scope
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Mallo provides native Codex activity visibility and a completed-response activity summary. Explain how this request improves one of those features.
+  - type: dropdown
+    id: feature
+    attributes:
+      label: Feature area
+      options:
+        - Live model, effort, task, or skill-read visibility
+        - Completed-response activity summary
+        - Compatibility or installation
+        - Privacy or reliability
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Describe the user problem and affected Codex surface.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the smallest useful change.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Include existing Codex or Mallo behavior that may already cover the need.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: This request fits Mallo's activity visibility or completion-summary scope.
+          required: true
+        - label: This request does not require posting private transcripts, credentials, or personal paths.
+          required: true

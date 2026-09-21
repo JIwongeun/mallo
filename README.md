@@ -1,54 +1,106 @@
-# Mallo (말로)
+<div align="center">
+  <img src="plugins/codex-system/assets/mallo.png" width="110" alt="Mallo mascot">
+  <h1>Mallo</h1>
+  <p><strong>See which models and skills helped with your Codex work.</strong></p>
+  <p>
+    <a href="https://github.com/JIwongeun/mallo/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/JIwongeun/mallo/actions/workflows/ci.yml/badge.svg"></a>
+    <img alt="Status: alpha" src="https://img.shields.io/badge/status-alpha-F59E0B">
+    <img alt="Codex plugin" src="https://img.shields.io/badge/Codex-plugin-111827">
+    <img alt="Node.js 24 or newer" src="https://img.shields.io/badge/Node.js-%3E%3D24-339933">
+    <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2563EB">
+  </p>
+  <p><a href="#install">Install</a> · <a href="#output">Preview</a> · <a href="CONTRIBUTING.md">Contribute</a> · <a href="SECURITY.md">Security</a></p>
+</div>
 
-경험을 먹고, 당신에게 맞춰지는 작은 생물.
+Mallo is a local, read-only activity observer for Codex. It has two features:
 
-Mallo는 현재 작업 폴더에서 동작하는 개인용 Codex 오케스트레이션 플러그인입니다. GPT-5.6 Sol이 medium effort로 요청을 분류하고 구현·수리를 맡으며, 계획이 필요한 작업은 GPT-6 Astra가 계획과 검토를 맡습니다. 실제 실행과 검토 근거가 있는 교훈만 개인 Knowledge에 축적해 다음 작업에서 재사용합니다.
+1. **Live visibility** into observed model, effort, task, and skill-read changes.
+2. **A completion summary** of the native activity observed for the response.
 
-## 사용
+Mallo reads existing Codex transcripts with deterministic Node.js code. It does not call another model, route work, control execution, or maintain a separate history database.
 
-Codex에서 대상 폴더를 열고 평소처럼 요청합니다. SessionStart 훅이 Mallo 사용 가능 여부를 알리면 `mallo` 스킬이 하나의 관리 실행을 시작합니다. 폴더 사전 등록, 상위 허브, `workspace/`는 필요하지 않습니다. 단순하고 위험이 낮은 작업은 Astra 계획 단계를 생략할 수 있습니다.
+## Output
 
-프로젝트별 실행 기록은 `.codex-system/`에 저장됩니다. 개인 데이터 루트는 `CODEX_SYSTEM_DATA_ROOT`가 있으면 그 경로, 없으면 `%CODEX_HOME%\codex-system`이며, `CODEX_HOME`의 기본값은 `%USERPROFILE%\.codex`입니다. 재사용 가능한 근거 스냅샷은 `<data_root>\knowledge`에, 설치 포인터는 `%CODEX_HOME%\codex-system.json`에 저장됩니다. 활성 CLI는 포인터가 가리키는 고정 설치 릴리스의 `src\cli.mjs`입니다.
+In Codex Desktop, the selected Mallo skill writes checkpoints to native MCP tool-result logs and ends the answer with a compact summary:
 
-## 지원 조건
+> **Mallo 작업요약**
+>
+> 요구사항 정리 · Astra/high · model-reasoning-router\
+> 구현 · Sol/high · 읽기 기록 없음
 
-- Windows와 PowerShell
-- Node.js 24 이상(지원 기준 Node 24), `pnpm@11.19.0`, Git, `tar`
-- 호환되는 로그인된 Codex와 실행 호스트에서 사용 가능한 `gpt-5.6-sol`, `gpt-6-astra`
-- 두 모델의 medium, high, xhigh reasoning effort
-- `config/skills.yaml`에 선언된 필수 `review-agent` 스킬. 외부 스킬은 사용자가 별도로 관리합니다.
+The Korean heading and row format above match current runtime output. In the interactive CLI, trusted hooks show native warning lines instead.
 
-오프라인 저장소 테스트에는 Codex 로그인이나 자격 증명이 필요하지 않습니다. `doctor`는 Codex 인증·모델과 스킬·훅 목록 조회를 확인하는 라이브 진단이며, 개별 필수 스킬의 존재나 훅 신뢰를 보증하지 않습니다.
+Model and effort values reflect recorded native metadata. A skill name means Mallo observed a matching read request; it does not prove the skill was followed. Missing read evidence does not prove that no preloaded skill was used.
+
+## Install
+
+Requirements:
+
+- Node.js 24 or newer
+- Codex Desktop or Codex CLI with plugin support
+- The `codex` command on `PATH` for the installation commands below
+- Read access to this repository while it is private
+
+Install from a source checkout:
 
 ```powershell
-pnpm install --frozen-lockfile
-node --test "test/*.test.mjs"
-
-# 라이브 진단: 로그인된 Codex 필요
-node src/cli.mjs doctor --json
+git clone https://github.com/JIwongeun/mallo.git
+cd mallo
+codex plugin marketplace add .
+codex plugin add codex-system@personal
 ```
 
-## 수동 설치와 업데이트
+The marketplace name is currently `personal`, and the compatibility identifier remains `codex-system@personal`. Check `codex plugin list --json` first if you already use a marketplace with that name.
 
-Mallo에는 범용 설치 프로그램이나 자동 업데이트가 없습니다. 검토된 로컬 Git 커밋과 그 커밋에 일치하는 깨끗한 소스 체크아웃에서 다음 명령을 실행합니다.
+Then:
 
-처음 설치하는 PC에서는 저장소 루트에서 `codex plugin marketplace add .`로 이 저장소의 marketplace를 등록합니다. 기존 `personal` marketplace가 이미 이 저장소를 가리키면 생략합니다. 다른 저장소를 가리키는 동일 이름의 marketplace는 덮어쓰지 말고 먼저 구성을 확인합니다.
+1. Open a new Codex task so it loads the plugin snapshot.
+2. Use `/hooks` to review and trust the Mallo hooks.
+3. Select `$mallo` when you want explicit Desktop checkpoints and the final summary.
+
+Mallo never changes hook trust. Skill selection and event delivery remain native Codex behavior, so they are not guaranteed for every task.
+
+## Update
+
+Update the checkout, then reinstall the existing compatibility identifier:
 
 ```powershell
-pnpm install --frozen-lockfile
-node src/cli.mjs release build --ref HEAD
-node src/cli.mjs release inspect --runtime <runtime_root>
-node src/cli.mjs install --runtime <runtime_root>
+git pull --ff-only
+codex plugin add codex-system@personal
 ```
 
-`release build`의 JSON 출력에 있는 `runtime_root`를 뒤의 두 명령에 사용합니다. 설치 시 소스 `HEAD`가 빌드 커밋과 일치해야 하고 추적 파일 변경이나 활성 관리 실행이 없어야 합니다. 설치되는 네이티브 ID는 `codex-system@personal`이며, 로컬 marketplace 이름은 `personal`입니다. 네이티브 훅 신뢰가 요청되면 Codex에서 직접 검토해야 하며 Mallo가 자동 승인하지 않습니다. 설치·업데이트 뒤에는 새 Codex 작업에서 플러그인, 스킬, 훅을 다시 발견해야 합니다. 소스 체크아웃을 편집해도 활성 고정 릴리스는 자동으로 바뀌지 않습니다.
+Open a fresh Codex task after updating. Mallo is distributed from source; no npm package is published.
 
-현재 지원 범위는 Windows 설치, Astra/Sol 라우팅, 수동 릴리스 교체입니다. Mallo는 외부 스킬과 훅을 발견해 선택하지만 설치·수정·삭제하지 않습니다. Jev, 로컬 임베딩, 다중 사용자 서비스, Obsidian 연동은 보류되어 있습니다.
+## Diagnostics
 
-## 저장소와 기여
+Use an explicit native session ID:
 
-저장소: [https://github.com/JIwongeun/mallo](https://github.com/JIwongeun/mallo)
+```powershell
+node plugins/codex-system/cli.mjs sessions --json
+node plugins/codex-system/cli.mjs status --session your_session_id_here
+node plugins/codex-system/cli.mjs watch --session your_session_id_here
+```
 
-변경은 `codex/*` 브랜치에서 만들고 pull request에 수용 기준, 실행한 검사, 보류된 검사 또는 환경 제약, 알려진 제한을 기록합니다. 병합 전 컨트롤러가 오프라인 테스트와 workflow YAML을 독립적으로 검증합니다. 릴리스 태그는 `vMAJOR.MINOR.PATCH` 형식의 불변 태그이며, 기존 태그의 대상을 이동하지 않습니다.
+`watch` prints changed one-line diagnostics in the terminal. It does not insert messages into a Codex conversation.
 
-상세 런타임 계약과 과거 검증 근거는 [구현 계획](docs/IMPLEMENTATION_PLAN.md)에 보존되어 있습니다.
+## Privacy
+
+Mallo derives activity metadata in memory from associated local Codex transcripts. It does not persist raw prompts, command arguments, tool results, credentials, or private reasoning. Desktop reporting uses the current task agent's normal context and output tokens; there is no separate reporting model, API key, analytics service, or network reporting service.
+
+## Compatibility
+
+Mallo is alpha software. Windows plugin discovery, native hooks, CLI output, MCP snapshots, and selected-skill summaries have been verified; fixture tests may pass elsewhere, but macOS and Linux have not been verified on real hosts. Other coding-agent hosts are unsupported because their transcripts, hooks, and trust models differ.
+
+## Develop
+
+Run the test suite from the repository root:
+
+```powershell
+npm test
+```
+
+The tests use temporary session roots and require no model API key. See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution rules and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the current technical contract and validation status.
+
+## License
+
+[MIT](LICENSE)

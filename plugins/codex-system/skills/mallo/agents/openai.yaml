@@ -1,0 +1,6 @@
+interface:
+  display_name: "Mallo"
+  short_description: "See task models, effort and referenced skills"
+  default_prompt: "Use $mallo to show progress in native tool logs and summarize which observed model and skills handled each part of this task."
+policy:
+  allow_implicit_invocation: true

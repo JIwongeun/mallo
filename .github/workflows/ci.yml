@@ -3,13 +3,19 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   test:
-    runs-on: windows-latest
+    name: Node 24 / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,12 +23,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Install pnpm
-        run: npm install --global pnpm@11.19.0
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Run offline tests
-        run: node --test "test/*.test.mjs"
-      - name: Parse workflow YAML
-        run: >
-          node --input-type=module -e "import { readFileSync } from 'node:fs'; import { parseDocument } from 'yaml'; const document = parseDocument(readFileSync('.github/workflows/ci.yml', 'utf8')); if (document.errors.length) throw document.errors[0];"
+      - name: Run activity and transport tests
+        run: npm test

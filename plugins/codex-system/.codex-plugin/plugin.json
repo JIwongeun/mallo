@@ -1,28 +1,29 @@
 {
   "name": "codex-system",
-  "version": "0.2.2+codex.20260920121845",
+  "version": "0.3.0+codex.20260921042224",
   "mcpServers": "./.mcp.json",
-  "description": "A small, formless companion that adapts through verified lessons from the user's work.",
+  "description": "Mallo shows models, effort and referenced skills for each Codex task, with native progress logs and a readable work summary.",
   "author": {
-    "name": "Local developer"
+    "name": "JIwongeun"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Mallo",
-    "shortDescription": "Adapts through verified work lessons",
-    "longDescription": "Mallo is a small, formless companion that adapts to the user through verified lessons from their work.",
-    "developerName": "Local developer",
+    "shortDescription": "See which models and skills helped with your work",
+    "longDescription": "Mallo reads native Codex activity, linking each observed task to its model, effort and skill references. Progress stays in native tool logs; a fixed blockquote ends the answer without a separate reporting model.",
+    "developerName": "JIwongeun",
     "category": "Productivity",
     "capabilities": [
-      "Current-folder orchestration",
-      "Lifecycle hooks",
-      "Local execution"
+      "App progress through the Mallo skill",
+      "Compact native activity snapshots",
+      "Completed-turn history",
+      "CLI status and watch"
     ],
     "defaultPrompt": [
-      "Use Mallo for this project task.",
-      "Show the latest Mallo run status."
+      "Use $mallo to show progress and a final activity summary while doing this task.",
+      "List sessions available to Mallo."
     ],
-    "brandColor": "#6366F1",
+    "brandColor": "#6D5BD0",
     "composerIcon": "./assets/mallo.png",
     "logo": "./assets/mallo.png",
     "logoDark": "./assets/mallo.png"

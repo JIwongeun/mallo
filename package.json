@@ -1,6 +1,8 @@
 {
   "name": "codex-system",
-  "version": "0.2.2",
+  "version": "0.3.0",
+  "description": "Read-only model, effort and skill activity for Codex.",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "repository": {
@@ -8,25 +10,11 @@
     "url": "git+https://github.com/JIwongeun/mallo.git"
   },
   "homepage": "https://github.com/JIwongeun/mallo#readme",
-  "bugs": {
-    "url": "https://github.com/JIwongeun/mallo/issues"
-  },
-  "engines": {
-    "node": ">=24"
-  },
-  "bin": {
-    "codex-system": "src/cli.mjs"
-  },
+  "bugs": { "url": "https://github.com/JIwongeun/mallo/issues" },
+  "engines": { "node": ">=24" },
+  "bin": { "mallo": "plugins/codex-system/cli.mjs" },
   "scripts": {
-    "doctor": "node src/cli.mjs doctor --json",
-    "install:integration": "node src/cli.mjs install",
-    "uninstall:integration": "node src/cli.mjs uninstall",
     "test": "node --test \"test/*.test.mjs\"",
-    "test:live": "node src/cli.mjs smoke dispatch --write-evidence",
-    "release:build": "node src/cli.mjs release build --ref HEAD"
-  },
-  "dependencies": {
-    "yaml": "2.8.1"
-  },
-  "packageManager": "pnpm@11.19.0"
+    "status": "node plugins/codex-system/cli.mjs sessions"
+  }
 }

@@ -1,16 +1,17 @@
-## Change
+## What changed
 
-What changed and why?
+Describe the problem and resulting behavior.
 
-## Acceptance and evidence
+## Validation
 
-- Criteria addressed:
-- Checks executed and results:
-- Pending checks or environment blocks:
-- Known limitations:
+- Checks run:
+- Native integration evidence, if applicable:
+- Remaining limitations:
 
 ## Checklist
 
-- [ ] The branch follows `codex/*`.
-- [ ] Offline tests and workflow YAML validation are recorded above.
+- [ ] The change stays within Mallo's two-feature scope.
+- [ ] Tests cover new non-trivial logic.
+- [ ] Output and fixtures contain no prompts, command arguments, results, credentials, or private reasoning.
+- [ ] Documentation reflects any user-visible or compatibility change.
 - [ ] Unrelated changes are preserved.

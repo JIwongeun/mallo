@@ -1,14 +1,106 @@
 {
+  "description": "Show changed native Mallo activity as one-line Codex system messages.",
   "hooks": {
-    "SessionStart": [
+    "UserPromptSubmit": [
       {
-        "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
-            "type": "command",
-            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/scripts/session-context.ps1\"",
-            "timeout": 5,
-            "statusMessage": "Checking Mallo availability..."
+            "type": "mcp_tool",
+            "server": "mallo",
+            "tool": "observe_activity",
+            "input": {
+              "session_id": "${session_id}",
+              "turn_id": "${turn_id}",
+              "hook_event_name": "${hook_event_name}",
+              "model": "${model}"
+            }
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "mallo",
+            "tool": "observe_activity",
+            "input": {
+              "session_id": "${session_id}",
+              "turn_id": "${turn_id}",
+              "hook_event_name": "${hook_event_name}",
+              "model": "${model}"
+            }
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "mallo",
+            "tool": "observe_activity",
+            "input": {
+              "session_id": "${session_id}",
+              "turn_id": "${turn_id}",
+              "hook_event_name": "${hook_event_name}",
+              "model": "${model}",
+              "agent_id": "${agent_id}"
+            }
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "mallo",
+            "tool": "observe_activity",
+            "input": {
+              "session_id": "${session_id}",
+              "turn_id": "${turn_id}",
+              "hook_event_name": "${hook_event_name}",
+              "model": "${model}",
+              "agent_id": "${agent_id}"
+            }
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "mallo",
+            "tool": "observe_activity",
+            "input": {
+              "session_id": "${session_id}",
+              "turn_id": "${turn_id}",
+              "hook_event_name": "${hook_event_name}",
+              "model": "${model}"
+            }
+          }
+        ]
+      }
+    ],
+    "Interrupt": [
+      {
+        "hooks": [
+          {
+            "type": "mcp_tool",
+            "server": "mallo",
+            "tool": "observe_activity",
+            "input": {
+              "session_id": "${session_id}",
+              "turn_id": "${turn_id}",
+              "hook_event_name": "${hook_event_name}",
+              "model": "${model}"
+            }
           }
         ]
       }
