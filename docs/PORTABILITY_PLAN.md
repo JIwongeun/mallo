@@ -1,7 +1,7 @@
 # Mallo portability plan
 
-Status: design reviewed on 2026-09-21; additional hosts are not implemented.
-Initial recommendation: Codex and Claude Code. OpenCode and custom runtimes follow only when selected and verified.
+Status: deferred. The first release targets Codex Desktop and CLI only.
+This is a future design reference; Claude Code, OpenCode, and custom runtime integrations are not implemented or scheduled for this release.
 
 ## Product contract
 

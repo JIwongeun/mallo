@@ -8,35 +8,68 @@
     <img alt="Node.js 24+" src="https://img.shields.io/badge/Node.js-24%2B-417E38">
     <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-2563EB">
   </p>
-  <p><a href="#what-you-see">Overview</a> · <a href="#integrations">Integrations</a> · <a href="#install">Install</a> · <a href="CONTRIBUTING.md">Contribute</a></p>
+  <p><a href="#what-you-see">Examples</a> · <a href="#install">Install</a> · <a href="#use">Use</a> · <a href="CONTRIBUTING.md">Contribute</a></p>
 </div>
 
 Mallo is a small activity companion for AI coding agents. See the model, reasoning effort, task, and skill reads behind the work, from the main conversation to delegated subtasks. Local and read-only, with no extra model calls.
 
+The first release supports **Codex Desktop and CLI**.
+
 ## What you see
 
-- **Show activity** — one task at a time, with its model, effort, and skill reads.
-- **Task summary** — the observed tasks together when the work is done.
+During work, **Show activity** displays only the task being reported. Once work finishes, **Task summary** gathers the observed main and subagent tasks. These illustrative examples follow Mallo's actual output format; the model assignments and task names are examples.
 
-Both use the same compact format:
+**Main conversation:** planning a change.
+
+<details open>
+<summary>Show activity</summary>
 
 ```text
-model/effort (main|sub) task [skills]
+GPT-6-Astra/xhigh (main) Plan authentication changes [brainstorming]
 ```
 
-Model names come from the agent's records. Skill brackets disappear when no reads are observed. A skill read is not proof of application, and a requested model is not confirmed execution.
+</details>
 
-## Integrations
+**Subagent:** implementing the feature. This checkpoint contains just that subtask.
 
-Mallo integrates with the tool running the agent, which supplies task records and a place to display them. Model providers and local backends depend on that tool's metadata.
+<details open>
+<summary>Show activity</summary>
 
-**Available:** Codex Desktop and CLI. **Planned:** Claude Code and OpenCode; see the [portability plan](docs/PORTABILITY_PLAN.md).
+```text
+GPT-5.6-Sol/high (sub) Implement sign-in flow [caveman]
+```
+
+</details>
+
+**Another subagent:** running checks, with no observed skill reads. There are no empty brackets or "no skills" labels.
+
+<details open>
+<summary>Show activity</summary>
+
+```text
+gpt-5.5/medium (sub) Run regression tests
+```
+
+</details>
+
+**After the work:** one summary, with one row per observed task.
+
+<details open>
+<summary>Task summary</summary>
+
+```text
+GPT-6-Astra/xhigh (main) Plan authentication changes [brainstorming]
+GPT-5.6-Sol/high (sub) Implement sign-in flow [caveman]
+gpt-5.5/medium (sub) Run regression tests
+```
+
+</details>
+
+Each row follows `model/effort (main|sub) task [skills]`. Model IDs other than the Astra and Sol display aliases are shown as recorded; missing effort appears as `unknown`. Mallo observes your agent's model choices—it does not choose or switch models. Skill names indicate observed reads, not proof of application.
 
 ## Install
 
-### Codex
-
-You need Node.js 24 or newer, plugin support, and the `codex` command on `PATH`. Clone access is required while this repository is private.
+You need Node.js 24 or newer, Codex Desktop or CLI with plugin support, and the `codex` command on `PATH`. Clone access is required while this repository is private.
 
 ```powershell
 git clone https://github.com/JIwongeun/mallo.git
@@ -47,7 +80,7 @@ codex plugin add mallo@mallo
 
 If the old plugin is installed, run `codex plugin remove codex-system@personal` before adding `mallo@mallo` to avoid two copies.
 
-#### Use
+## Use
 
 1. Open a new Codex task to load the plugin.
 2. Review and trust the Mallo hooks with `/hooks`.
@@ -55,7 +88,7 @@ If the old plugin is installed, run `codex plugin remove codex-system@personal` 
 
 For example, ask: `Use $mallo while reviewing this repository for bugs.`
 
-#### Update
+## Update
 
 From the source checkout:
 
