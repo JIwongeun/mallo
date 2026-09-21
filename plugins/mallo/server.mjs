@@ -8,7 +8,7 @@ const tools = [
   {
     name: "show_activity",
     title: "Show activity",
-    description: "Read native Codex activity for one explicit session id. Set view=current for a compact exact-thread checkpoint.",
+    description: "Read native Codex activity for one explicit session id. Set view=current and phase=progress for the current turn and associated worker turns, or add focus_task to show one task.",
     inputSchema: {
       type: "object",
       properties: {
@@ -16,7 +16,7 @@ const tools = [
         view: { type: "string", enum: ["current"] },
         phase: { type: "string", enum: ["progress", "summary"] },
         turn_id: { type: "string", description: "Optional exact native turn UUID." },
-        focus_task: { type: "string", minLength: 1, maxLength: 160, description: "Progress-only native task label to display; use main for the coordinator." },
+        focus_task: { type: "string", minLength: 1, maxLength: 160, description: "Optional progress-only native task label to display alone; use main for the coordinator." },
         task_labels: {
           type: "object",
           description: "Short grounded English task names keyed by main or an exact native worker task label. Non-English or invalid display strings fall back.",

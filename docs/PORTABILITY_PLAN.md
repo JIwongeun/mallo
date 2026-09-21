@@ -5,7 +5,7 @@ This is a future design reference; Claude Code, OpenCode, and custom runtime int
 
 ## Product contract
 
-Mallo shows current task activity and one final activity summary. It observes execution; it does not route models, execute tasks, add inference calls, or keep a second activity database. Display text and task aliases remain English. Preserve the current compact row format and omit empty skill brackets.
+Mallo shows cumulative current-turn activity and one final activity summary. It observes execution; it does not route models, execute tasks, add inference calls, or keep a second activity database. Display text and task aliases remain English. Preserve each task's model/effort/role header with a separate `- skill` line for every observed skill; omit skill lines when empty. Compact CLI hook lines remain a separate delivery format.
 
 Integrate with the agent host that manages sessions, tools, skills, and workers. Model providers are a separate dimension. A host adapter can cover different backends when the host exposes their metadata. A raw inference API cannot supply a host's skill and worker activity unless the calling application reports it.
 

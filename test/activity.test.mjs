@@ -74,11 +74,13 @@ test("reads native parent/worker activity without retaining raw content", async 
   assert(!serialized.includes("Get-Content"));
   const line = formatStatusLine(status);
   assert(!line.includes("\n"));
-  assert.match(line, /main gpt-5\.6-sol\/high/);
-  assert.match(line, /workers 1 \(gpt-6-astra\/high\)/);
+  assert.match(line, /main GPT-5\.6-Sol\/high/);
+  assert.match(line, /workers 1 \(GPT-6-Astra\/high\)/);
   assert.match(line, /mallo-helper/);
   assert(!line.includes("Codex-System:Mallo"));
   const full = formatStatus(status);
+  assert.match(full, /GPT-5\.6-Sol\/high/);
+  assert.match(full, /GPT-6-Astra\/high/);
   assert.match(full, /Skills: real-skill, second-skill, mallo-helper/);
   assert(!full.includes("Codex-System:Mallo"));
   const statusReader = (sessionId) => getStatus(sessionId, { transcriptRoots: [root], now: () => Date.parse("2026-09-20T00:04:00Z") });
@@ -89,8 +91,8 @@ test("reads native parent/worker activity without retaining raw content", async 
   assert(!current.line.includes("workers 1"));
   assert.equal(current.steps.length, 1);
   assert.equal(current.steps[0].task, "Main task");
-  assert(current.markdown.startsWith("> GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task"));
-  assert(current.markdown.includes("> GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task \\[real\\-skill"));
+  assert(current.markdown.startsWith("GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task"));
+  assert(current.markdown.includes("- real\\-skill\n- second\\-skill\n- mallo\\-helper"));
   assert.match(current.markdown, /mallo\\-helper/);
   assert(!current.markdown.includes("Codex-System:Mallo"));
   assert.match(current.markdown, /Partial coverage/);
@@ -100,7 +102,7 @@ test("reads native parent/worker activity without retaining raw content", async 
   assert(!activeSummary.line.includes("In progress"));
   assert(!activeSummary.line.includes("Native turn completed"));
   assert(!activeSummary.line.includes("success"));
-  assert(activeSummary.markdown.startsWith("> GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task"));
+  assert(activeSummary.markdown.startsWith("GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task"));
   assert(!activeSummary.markdown.includes("Native turn completed"));
   const completed = await currentActivity({ session_id: ROOT, turn_id: TURN_DONE, phase: "summary" }, { statusReader });
   assert.match(completed.line, /Completion checkpoint · Native turn completed/);
@@ -109,8 +111,11 @@ test("reads native parent/worker activity without retaining raw content", async 
     ["Main task", "gpt-5.6-sol", "high"],
     ["compact presentation", "gpt-6-astra", "high"],
   ]);
+  const completedProgress = await currentActivity({ session_id: ROOT, turn_id: TURN_DONE, phase: "progress" }, { statusReader });
+  assert.deepEqual(completedProgress.steps.map((step) => step.turn_id), [TURN_DONE, CHILD_TURN]);
+  assert.equal(completedProgress.text, completed.text);
   assert(!completed.line.includes("success"));
-  assert(completed.markdown.includes("> GPT\\-6\\-Astra\\/high \\(sub\\) compact presentation"));
+  assert(completed.markdown.includes("\n\nGPT\\-6\\-Astra\\/high \\(sub\\) compact presentation"));
   assert(!completed.markdown.includes("No skill read observed"));
   const cliFocused = spawnSync(process.execPath, [cliPath, "status", "--session", ROOT, "--view", "current", "--phase", "progress", "--turn", TURN_DONE, "--focus-task", "compact_presentation", "--json"], { encoding: "utf8", env: { ...process.env, MALLO_TRANSCRIPT_ROOTS: root } });
   assert.equal(cliFocused.status, 0, cliFocused.stderr);
@@ -131,7 +136,7 @@ test("reads native parent/worker activity without retaining raw content", async 
   assert.equal(missing.line, "Mallo · Activity unavailable");
   assert.equal(missing.text, "Activity unavailable");
   assert.deepEqual(missing.steps, []);
-  assert.equal(missing.markdown, "> Activity unavailable");
+  assert.equal(missing.markdown, "Activity unavailable");
   const interrupted = await currentActivity({ session_id: ROOT, turn_id: TURN_OLD, phase: "progress" }, { statusReader });
   assert.equal(interrupted.native_state, "interrupted_or_unknown");
   assert.match(interrupted.line, /Native turn state unavailable/);

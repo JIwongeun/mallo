@@ -16,7 +16,7 @@ export async function main(argv = process.argv.slice(2)) {
   if (command === "status" && flags.view === "current") {
     if ("format" in flags && !["plain", "markdown"].includes(flags.format)) throw new Error("--format must be plain or markdown");
     const snapshot = await currentActivity({ session_id: sessionId, phase: requiredFlag(flags, "phase"), turn_id: flags.turn, focus_task: flags["focus-task"] });
-    return print(flags.json ? snapshot : flags.format === "markdown" ? snapshot.markdown : snapshot.line, flags.json);
+    return print(flags.json ? snapshot : flags.format === "markdown" ? snapshot.markdown : snapshot.text, flags.json);
   }
   if (command === "status") {
     if (flags.view !== undefined || flags.phase !== undefined || flags.turn !== undefined || flags["focus-task"] !== undefined || "format" in flags) throw new Error("--phase, --turn, --focus-task, and --format require --view current");

@@ -1,6 +1,6 @@
 {
   "name": "mallo",
-  "version": "0.3.2+codex.20260921071523",
+  "version": "0.3.2+codex.20260921105936",
   "mcpServers": "./.mcp.json",
   "description": "See models, effort, and skill reads.",
   "author": {
@@ -15,12 +15,12 @@
     "category": "Productivity",
     "capabilities": [
       "Native progress and completion logs through the Mallo skill",
-      "Compact native activity snapshots",
+      "Cumulative activity with complete skill-read lists",
       "Completed-turn history",
       "CLI status and watch"
     ],
     "defaultPrompt": [
-      "Use $mallo for focused Show activity checkpoints and one Task summary native tool log after this task's work is complete.",
+      "Use $mallo for cumulative Show activity checkpoints with complete skill lists and one Task summary native tool log after this task's work is complete.",
       "List sessions available to Mallo."
     ],
     "brandColor": "#6D5BD0",

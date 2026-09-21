@@ -99,7 +99,7 @@ export function formatStatus(status) {
     const turn = agent.turns.at(-1);
     const model = turn?.model?.value ?? "unknown";
     const effort = turn?.effort?.value ?? "unknown";
-    lines.push(`${agent.role === "main" ? "Main" : "Worker"} ${shortId(agent.thread_id)}: ${model}/${effort}; ${turn?.state ?? "unknown"}`);
+    lines.push(`${agent.role === "main" ? "Main" : "Worker"} ${shortId(agent.thread_id)}: ${modelDisplayName(model)}/${effort}; ${turn?.state ?? "unknown"}`);
     if (turn?.current_tool) lines.push(`  Current tool: ${turn.current_tool.name} (${turn.current_tool.status})`);
     lines.push(`  Skills: ${formatSkills(turn?.skills)}`);
   }
@@ -118,17 +118,22 @@ export function formatStatus(status) {
 export function formatStatusLine(status) {
   const main = status.agents.find((agent) => agent.role === "main")?.turns.at(-1);
   const workers = status.agents.filter((agent) => agent.role === "worker").map((agent) => agent.turns.at(-1)).filter(Boolean);
-  const workerModels = [...new Set(workers.map((turn) => `${turn.model?.value ?? "unknown"}/${turn.effort?.value ?? "unknown"}`))];
+  const workerModels = [...new Set(workers.map((turn) => `${modelDisplayName(turn.model?.value ?? "unknown")}/${turn.effort?.value ?? "unknown"}`))];
   const skills = [...new Set(status.agents.flatMap((agent) => agent.turns.at(-1)?.skills.items.map((item) => item.name).filter(isVisibleSkillName) ?? []))];
   const state = status.session.state === "active" ? "In progress" : status.session.state === "native_turn_completed" ? "Response completed" : "State unavailable";
   const parts = [
     `Mallo · ${state}`,
-    `main ${main?.model?.value ?? "unknown"}/${main?.effort?.value ?? "unknown"}`,
+    `main ${modelDisplayName(main?.model?.value ?? "unknown")}/${main?.effort?.value ?? "unknown"}`,
   ];
   if (workers.length) parts.push(`workers ${workers.length} (${workerModels.join(", ")})`);
   if (status.current?.current_tool) parts.push(`Tool ${status.current.current_tool.name}`);
   parts.push(skills.length ? `Skill reads ${skills.join(", ")}` : status.coverage.state === "complete" ? "No skill read observed" : "Skill coverage incomplete");
   return parts.join(" · ");
+}
+
+export function modelDisplayName(model) {
+  return model.replace(/(^|\/)gpt-(\d+(?:\.\d+)*)(?:-(astra|sol|terra|luna))?(?=$|[-:/])/i,
+    (_, prefix, version, codename) => `${prefix}GPT-${version}${codename ? `-${codename[0].toUpperCase()}${codename.slice(1).toLowerCase()}` : ""}`);
 }
 
 export function isVisibleSkillName(name) {

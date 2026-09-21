@@ -8,6 +8,8 @@ import test from "node:test";
 
 const ROOT = "019d2000-0000-7000-8000-000000000001";
 const TURN = "019d2000-0000-7000-8000-000000000002";
+const WORKER = "019d2000-0000-7000-8000-000000000003";
+const WORKER_TURN = "019d2000-0000-7000-8000-000000000004";
 const serverPath = resolve("plugins/mallo/server.mjs");
 const cliPath = resolve("plugins/mallo/cli.mjs");
 
@@ -113,12 +115,12 @@ test("MCP exposes only read-only activity tools", async (t) => {
   assert.match(pending.content[0].text, /^New worker observation pending$/);
   const cliCompact = spawnSync(process.execPath, [cliPath, "status", "--session", ROOT, "--view", "current", "--phase", "summary", "--turn", TURN], { encoding: "utf8", env: { ...process.env, MALLO_TRANSCRIPT_ROOTS: transcriptRoot } });
   assert.equal(cliCompact.status, 0, cliCompact.stderr);
-  assert.equal(cliCompact.stdout.trim(), snapshot.line);
+  assert.equal(cliCompact.stdout.trim(), snapshot.text);
   const cliMarkdown = spawnSync(process.execPath, [cliPath, "status", "--session", ROOT, "--view", "current", "--phase", "summary", "--turn", TURN, "--format", "markdown"], { encoding: "utf8", env: { ...process.env, MALLO_TRANSCRIPT_ROOTS: transcriptRoot } });
   assert.equal(cliMarkdown.status, 0, cliMarkdown.stderr);
   assert.equal(cliMarkdown.stdout.trim(), snapshot.markdown);
-  assert(snapshot.markdown.startsWith("> GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task"));
-  assert(snapshot.markdown.split("\n").every((line) => line.startsWith(">")));
+  assert(snapshot.markdown.startsWith("GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task"));
+  assert(!snapshot.markdown.startsWith(">"));
   const malformed = await client.call("tools/call", { name: "show_activity", arguments: { session_id: "latest" } });
   assert.equal(malformed.isError, true);
   const missingPhase = await client.call("tools/call", { name: "show_activity", arguments: { session_id: ROOT, view: "current" } });
@@ -151,6 +153,40 @@ test("MCP exposes only read-only activity tools", async (t) => {
   assert.equal(repeatedCompact.content[0].text, compact.content[0].text);
 });
 
+test("MCP and plain CLI show full worker and skill rows while focus filters one task", async (t) => {
+  const transcriptRoot = await fixture({ worker: true });
+  const client = startClient(transcriptRoot);
+  t.after(() => client.close());
+  const labels = { main: "Transport check", review_task: "Review task" };
+  const base = { session_id: ROOT, view: "current", phase: "progress", turn_id: TURN, task_labels: labels };
+  const progress = await client.call("tools/call", { name: "show_activity", arguments: base });
+  const expected = [
+    "GPT-5.6-Sol/high (main) Transport check",
+    "- alpha",
+    "- beta",
+    "- gamma",
+    "- delta",
+    "",
+    "GPT-6-Astra/high (sub) Review task",
+    "- worker-skill",
+  ].join("\n");
+  assert.equal(progress.content[0].text, expected);
+  const focused = await client.call("tools/call", { name: "show_activity", arguments: { ...base, focus_task: "review_task" } });
+  assert.equal(focused.content[0].text, "GPT-6-Astra/high (sub) Review task\n- worker-skill");
+  const summary = await client.call("tools/call", { name: "task_summary", arguments: { session_id: ROOT, turn_id: TURN, task_labels: labels } });
+  assert.equal(summary.content[0].text, expected);
+  const unaliased = await client.call("tools/call", { name: "show_activity", arguments: { session_id: ROOT, view: "current", phase: "progress", turn_id: TURN } });
+  const env = { ...process.env, MALLO_TRANSCRIPT_ROOTS: transcriptRoot };
+  const args = [cliPath, "status", "--session", ROOT, "--view", "current", "--phase", "progress", "--turn", TURN];
+  for (const format of [[], ["--format", "plain"]]) {
+    const cli = spawnSync(process.execPath, [...args, ...format], { encoding: "utf8", env });
+    assert.equal(cli.status, 0, cli.stderr);
+    assert.equal(cli.stdout.trim(), unaliased.content[0].text);
+    assert.match(cli.stdout, /\n- delta\n\nGPT-6-Astra\/high \(sub\) review task\n- worker-skill\n$/);
+    assert.doesNotMatch(cli.stdout, /\\[-./()]|^> |\+\d|\[/m);
+  }
+});
+
 test("CLI requires an explicit status session and reads isolated roots", async () => {
   const transcriptRoot = await fixture();
   const env = { ...process.env, MALLO_TRANSCRIPT_ROOTS: transcriptRoot };
@@ -160,6 +196,24 @@ test("CLI requires an explicit status session and reads isolated roots", async (
   const result = spawnSync(process.execPath, [cliPath, "status", "--session", ROOT, "--json"], { encoding: "utf8", env });
   assert.equal(result.status, 0, result.stderr);
   assert.equal(JSON.parse(result.stdout).session.id, ROOT);
+  assert.equal(JSON.parse(result.stdout).current.model.value, "gpt-5.6-sol");
+  const plainStatus = spawnSync(process.execPath, [cliPath, "status", "--session", ROOT], { encoding: "utf8", env });
+  assert.equal(plainStatus.status, 0, plainStatus.stderr);
+  assert.match(plainStatus.stdout, /GPT-5\.6-Sol\/high/);
+  const watch = spawn(process.execPath, [cliPath, "watch", "--session", ROOT], { env, stdio: ["ignore", "pipe", "pipe"] });
+  let timer;
+  try {
+    const first = await new Promise((resolve, reject) => {
+      timer = setTimeout(() => reject(new Error("watch did not produce a line")), 5000);
+      watch.stdout.once("data", (chunk) => resolve(String(chunk)));
+      watch.once("error", reject);
+      watch.once("exit", (code) => reject(new Error(`watch exited ${code}`)));
+    });
+    assert.match(first, /main GPT-5\.6-Sol\/high/);
+  } finally {
+    clearTimeout(timer);
+    watch.kill();
+  }
   const compact = spawnSync(process.execPath, [cliPath, "status", "--session", ROOT, "--view", "current", "--phase", "progress", "--json"], { encoding: "utf8", env });
   assert.equal(compact.status, 0, compact.stderr);
   assert.deepEqual(Object.keys(JSON.parse(compact.stdout)), ["schema_version", "thread_id", "turn_id", "native_state", "coverage", "steps", "line", "text", "markdown"]);
@@ -179,7 +233,7 @@ test("CLI requires an explicit status session and reads isolated roots", async (
   }
 });
 
-async function fixture() {
+async function fixture({ worker = false } = {}) {
   const root = await mkdtemp(join(tmpdir(), "mallo-transport-"));
   const records = [
     { timestamp: "2026-09-20T00:00:00Z", type: "session_meta", payload: { id: ROOT, session_id: ROOT, timestamp: "2026-09-20T00:00:00Z" } },
@@ -188,9 +242,22 @@ async function fixture() {
     { timestamp: "2026-09-20T00:00:02Z", type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "SECRET_PROMPT" }] } },
     { timestamp: "2026-09-20T00:00:02Z", type: "response_item", payload: { type: "function_call", name: "functions.exec_command", call_id: "private-call", arguments: JSON.stringify({ cmd: "Write-Output SECRET_ARGUMENT" }) } },
     { timestamp: "2026-09-20T00:00:02Z", type: "response_item", payload: { type: "function_call_output", call_id: "private-call", output: JSON.stringify({ exit_code: 0, output: "SECRET_RESULT" }) } },
+    ...(worker ? [
+      { timestamp: "2026-09-20T00:00:02Z", type: "response_item", payload: { type: "custom_tool_call", name: "functions.exec", call_id: "skill-call", status: "completed", input: "await tools.exec_command({cmd:'Get-Content C:/skills/alpha/SKILL.md; Get-Content C:/skills/beta/SKILL.md; Get-Content C:/skills/gamma/SKILL.md; Get-Content C:/skills/delta/SKILL.md'})" } },
+    ] : []),
     { timestamp: "2026-09-20T00:00:03Z", type: "event_msg", payload: { type: "task_complete", turn_id: TURN, completed_at: "2026-09-20T00:00:03Z", duration_ms: 2000 } },
   ];
   await writeFile(join(root, `rollout-${ROOT}.jsonl`), `${records.map(JSON.stringify).join("\n")}\n`);
+  if (worker) {
+    const workerRecords = [
+      { timestamp: "2026-09-20T00:00:00Z", type: "session_meta", payload: { id: WORKER, session_id: ROOT, timestamp: "2026-09-20T00:00:00Z", source: { subagent: { thread_spawn: { parent_thread_id: ROOT, agent_path: "/root/review_task" } } } } },
+      { timestamp: "2026-09-20T00:00:02Z", type: "event_msg", payload: { type: "task_started", turn_id: WORKER_TURN, started_at: "2026-09-20T00:00:02Z" } },
+      { timestamp: "2026-09-20T00:00:02Z", type: "turn_context", payload: { turn_id: WORKER_TURN, model: "gpt-6-astra", effort: "high" } },
+      { timestamp: "2026-09-20T00:00:02Z", type: "response_item", payload: { type: "custom_tool_call", name: "functions.exec", call_id: "worker-skill-call", status: "completed", input: "await tools.exec_command({cmd:'Get-Content C:/skills/worker-skill/SKILL.md'})" } },
+      { timestamp: "2026-09-20T00:00:02Z", type: "event_msg", payload: { type: "task_complete", turn_id: WORKER_TURN, completed_at: "2026-09-20T00:00:02Z", duration_ms: 0 } },
+    ];
+    await writeFile(join(root, `rollout-${WORKER}.jsonl`), `${workerRecords.map(JSON.stringify).join("\n")}\n`);
+  }
   return root;
 }
 

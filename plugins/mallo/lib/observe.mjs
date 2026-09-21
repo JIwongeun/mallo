@@ -1,4 +1,4 @@
-import { getStatus, isVisibleSkillName } from "./activity.mjs";
+import { getStatus, isVisibleSkillName, modelDisplayName } from "./activity.mjs";
 
 const EVENTS = new Set(["UserPromptSubmit", "PostToolUse", "SubagentStart", "SubagentStop", "Stop", "Interrupt"]);
 const ID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
@@ -18,9 +18,9 @@ export async function currentActivity(input, options = {}) {
   if (!agent || !turn) return unavailableSnapshot(input);
 
   const current = { ...turn, thread_id: agent.thread_id, role: agent.role, task_label: agent.task_label };
-  const focused = input.phase === "progress" ? focusedStep(status, current, input.focus_task, input.task_labels) : null;
+  const focused = input.phase === "progress" && input.focus_task ? focusedStep(status, current, input.focus_task, input.task_labels) : null;
   if (input.phase === "progress" && input.focus_task && !focused) return pendingSnapshot(input, status.coverage.state);
-  const steps = input.phase === "summary" ? scopedSteps(status, current, input.task_labels) : [focused ?? labeledStep(agent, current, input.task_labels)];
+  const steps = input.phase === "summary" || !input.focus_task ? scopedSteps(status, current, input.task_labels) : [focused];
   const displayCurrent = input.phase === "progress" ? steps[0] : current;
   return {
     schema_version: 1,
@@ -145,27 +145,29 @@ function formatLine(phase, current, steps, coverage) {
 }
 
 function formatText(steps, coverage) {
-  const lines = [];
-  for (const step of steps.slice(0, PREVIEW_LIMIT)) lines.push(formatStepLine(step));
-  const notes = summaryNotes(steps, coverage);
-  if (notes.length) lines.push(...notes);
-  return lines.join("\n");
+  const blocks = steps.map((step) => formatStepBlock(step, (value) => value));
+  if (coverage !== "complete") blocks.push(coverageNote(coverage));
+  return blocks.join("\n\n");
 }
 
 function formatMarkdown(steps, coverage) {
-  const lines = [];
-  for (const step of steps.slice(0, PREVIEW_LIMIT)) {
-    lines.push(`> ${markdownLabel(formatStepLine(step))}  `);
-  }
-  const notes = summaryNotes(steps, coverage);
-  if (notes.length) lines.push(...notes.map((note) => `> ${markdownLabel(note)}`));
-  return lines.join("\n").trimEnd();
+  const blocks = steps.map((step) => formatStepBlock(step, markdownLabel));
+  if (coverage !== "complete") blocks.push(markdownLabel(coverageNote(coverage)));
+  return blocks.join("\n\n");
 }
 
 function formatStepLine(step) {
   const skills = formatStepSkills(step.skills);
+  return `${formatStepHeader(step)}${skills ? ` [${skills}]` : ""}`;
+}
+
+function formatStepBlock(step, escape) {
+  return [escape(formatStepHeader(step)), ...step.skills.map((skill) => `- ${escape(skill)}`)].join("\n");
+}
+
+function formatStepHeader(step) {
   const role = roleAlias(step.role);
-  return `${modelDisplayName(step.model)}/${step.effort}${role ? ` (${role})` : ""} ${taskWithState(step)}${skills ? ` [${skills}]` : ""}`;
+  return `${modelDisplayName(step.model)}/${step.effort}${role ? ` (${role})` : ""} ${taskWithState(step)}`;
 }
 
 function taskWithState(step) {
@@ -185,18 +187,7 @@ function formatStepSkills(skills) {
   return `${skills.slice(0, SKILL_PREVIEW_LIMIT).join(", ")}${skills.length > SKILL_PREVIEW_LIMIT ? ` +${skills.length - SKILL_PREVIEW_LIMIT}` : ""}`;
 }
 
-function summaryNotes(steps, coverage) {
-  const notes = detailNotes(steps);
-  if (coverage !== "complete") notes.push(`${coverage === "unavailable" ? "Coverage unavailable" : "Partial coverage"}.`);
-  return notes;
-}
-
-function detailNotes(steps) {
-  const notes = [];
-  if (steps.length > PREVIEW_LIMIT) notes.push(`${steps.length - PREVIEW_LIMIT} more tasks. Request the full record to inspect them.`);
-  if (steps.some((step) => step.skills.length > SKILL_PREVIEW_LIMIT)) notes.push("Skill lists were shortened. Request the full record to inspect them.");
-  return notes;
-}
+function coverageNote(coverage) { return `${coverage === "unavailable" ? "Coverage unavailable" : "Partial coverage"}.`; }
 
 function taskName(role, value) {
   if (role === "main") return "Main task";
@@ -233,12 +224,6 @@ function snapshotState(phase, current) {
   return `${phase === "summary" ? "Completion checkpoint · " : ""}Native turn state unavailable`;
 }
 
-function modelDisplayName(model) {
-  if (model === "gpt-6-astra") return "GPT-6-Astra";
-  if (model === "gpt-5.6-sol") return "GPT-5.6-Sol";
-  return model;
-}
-
 function markdownLabel(value) {
   return String(value).replace(/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/g, "\\$&");
 }
@@ -254,7 +239,7 @@ function unavailableSnapshot(input) {
     steps: [],
     line,
     text: "Activity unavailable",
-    markdown: "> Activity unavailable",
+    markdown: "Activity unavailable",
   };
 }
 
@@ -269,7 +254,7 @@ function pendingSnapshot(input, coverage) {
     steps: [],
     line: `Mallo · Observation pending · ${task}`,
     text: `${task} observation pending`,
-    markdown: `> ${markdownLabel(task)} observation pending`,
+    markdown: `${markdownLabel(task)} observation pending`,
   };
 }
 

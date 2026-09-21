@@ -17,20 +17,31 @@ test("immediate prompt uses hook model without leaking a stale turn", async () =
   assert.deepEqual(await observeActivity(input("UserPromptSubmit"), memory, { statusReader: async () => status }), {});
 });
 
-test("display names leave unknown and versioned model IDs and raw metadata unchanged", async () => {
-  for (const model of ["vendor/model-v2", "gpt-6-astra-2026-09-21", "gpt-5.6-sol-2026-09-21"]) {
+test("display names normalize GPT families while leaving raw metadata and other IDs unchanged", async () => {
+  for (const [model, displayed] of [
+    ["gpt-5.5", "GPT-5.5"],
+    ["gpt-6-astra-2026-09-21", "GPT-6-Astra-2026-09-21"],
+    ["gpt-5.6-sol-2026-09-21", "GPT-5.6-Sol-2026-09-21"],
+    ["gpt-5.6-terra-preview", "GPT-5.6-Terra-preview"],
+    ["gpt-5.6-luna:latest", "GPT-5.6-Luna:latest"],
+    ["openai/gpt-6-astra-2026-09-21", "openai/GPT-6-Astra-2026-09-21"],
+    ["vendor/model-v2", "vendor/model-v2"],
+    ["gpt-custom", "gpt-custom"],
+  ]) {
     const status = fixtureStatus();
     status.agents[0].turns.at(-1).model.value = model;
     const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary" }, { statusReader: async () => status });
     assert.equal(snapshot.steps[0].model, model);
-    assert(snapshot.text.startsWith(`${model}/xhigh`));
+    assert(snapshot.text.startsWith(`${displayed}/xhigh`));
+    if (model === "gpt-5.5") assert(snapshot.markdown.startsWith("GPT\\-5\\.5\\/xhigh"));
+    assert(snapshot.line.includes(`${displayed}/xhigh`));
     assert.equal(status.history.at(-1).model.value, model);
     const hook = await observeActivity(input("PostToolUse"), new Map(), { statusReader: async () => status });
-    assert(hook.systemMessage.includes(`${model}/xhigh (main)`));
+    assert(hook.systemMessage.includes(`${displayed}/xhigh (main)`));
     const hookOnly = await observeActivity({ ...input("UserPromptSubmit"), model }, new Map(), { statusReader: async () => fixtureStatus({ includeCurrent: false }) });
-    assert(hookOnly.systemMessage.includes(`${model}/effort pending`));
+    assert(hookOnly.systemMessage.includes(`${displayed}/effort pending`));
     const unavailable = await observeActivity({ ...input("PostToolUse"), model }, new Map(), { statusReader: async () => { throw new Error("reader failed"); } });
-    assert(unavailable.systemMessage.includes(`${model}/effort unknown`));
+    assert(unavailable.systemMessage.includes(`${displayed}/effort unknown`));
   }
 });
 
@@ -102,6 +113,17 @@ test("current view keeps every in-window reused-worker turn while hooks stay per
     ["code implementation (2)", "custom-model", "medium", ["second-skill"]],
   ]);
   assert(!JSON.stringify(snapshot).includes("unrelated-skill"));
+  const progress = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress" }, { statusReader: async () => status });
+  assert.deepEqual(progress.steps.map((step) => step.turn_id), [TURN, relevant.turn_id, second.turn_id]);
+  assert.equal(progress.text, [
+    "GPT-6-Astra/xhigh (main) Main task",
+    "",
+    "GPT-5.6-Sol/high (sub) code implementation",
+    "- worker-skill",
+    "",
+    "custom-model/medium (sub) code implementation (2)",
+    "- second-skill",
+  ].join("\n"));
 
   const focused = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", focus_task: "code_implementation" }, { statusReader: async () => status });
   assert.deepEqual(focused.steps.map((step) => [step.turn_id, step.model, step.skills]), [
@@ -137,7 +159,7 @@ test("observer fails open and rejects control-character labels", async () => {
   assert.deepEqual(await observeActivity({ ...input("PostToolUse"), model: "safe\u001b[31m" }, memory, { statusReader: async () => fixtureStatus() }), {});
   const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary" }, { statusReader: async () => { throw new Error("SECRET_FAILURE"); } });
   assert.equal(snapshot.text, "Activity unavailable");
-  assert.equal(snapshot.markdown, "> Activity unavailable");
+  assert.equal(snapshot.markdown, "Activity unavailable");
 });
 
 test("compact presentation hides only self reads and escapes untrusted Markdown labels", async () => {
@@ -168,7 +190,8 @@ test("compact presentation hides only self reads and escapes untrusted Markdown 
   assert(!snapshot.text.includes("> **"));
   assert(!snapshot.markdown.includes("Main task \\(In progress\\)"));
   for (const value of [snapshot.markdown, snapshot.text]) assert.doesNotMatch(value, /display order|skills prove application/i);
-  assert(snapshot.markdown.split("\n").every((line) => line.startsWith(">")));
+  assert(snapshot.markdown.includes("- safe\\]\\(https\\:\\/\\/skills\\.invalid\\)"));
+  assert(!snapshot.markdown.startsWith(">"));
   assert(!snapshot.markdown.includes("|---|"));
 });
 
@@ -178,7 +201,9 @@ test("summary uses headerless task rows", async () => {
   status.agents[0].turns.at(-1).effort.value = "high";
   const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary" }, { statusReader: async () => status });
   assert.equal(snapshot.markdown, [
-    "> GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task \\[caveman\\, ponytail\\]",
+    "GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task",
+    "- caveman",
+    "- ponytail",
   ].join("\n"));
 });
 
@@ -188,7 +213,7 @@ test("missing native role does not invent a main or sub marker", async () => {
   status.history.at(-1).role = undefined;
   const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress" }, { statusReader: async () => status });
   assert.equal(snapshot.steps[0].role, null);
-  assert.equal(snapshot.text, "GPT-6-Astra/xhigh Task [caveman]");
+  assert.equal(snapshot.text, "GPT-6-Astra/xhigh Task\n- caveman");
   assert(!/\((?:main|sub)\)/.test(snapshot.line));
 });
 
@@ -208,9 +233,10 @@ test("current view uses English aliases for native task keys and ignores invalid
     },
   }, { statusReader: async () => status });
 
-  assert.equal(snapshot.text.split("\n", 1)[0], "GPT-6-Astra/xhigh (main) Requirements <review> [main-skill]");
+  assert.equal(snapshot.text.split("\n", 1)[0], "GPT-6-Astra/xhigh (main) Requirements <review>");
   assert.deepEqual(snapshot.steps.map((step) => [step.task, step.model, step.effort, step.skills]), [
     ["Requirements <review>", "gpt-6-astra", "xhigh", ["main-skill"]],
+    ["Implementation](https://labels.invalid)", "gpt-5.6-sol", "high", ["worker-skill"]],
   ]);
   const focused = await currentActivity({
     session_id: SESSION,
@@ -227,12 +253,12 @@ test("current view uses English aliases for native task keys and ignores invalid
   assert(!focused.markdown.includes("](https://labels.invalid)"));
 
   const summary = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary", task_labels: { 구현_작업: "Implementation review" } }, { statusReader: async () => status });
-  assert.match(summary.text, /GPT-5.6-Sol\/high \(sub\) Implementation review \[worker-skill\]/);
+  assert.match(summary.text, /GPT-5.6-Sol\/high \(sub\) Implementation review\n- worker-skill/);
   assert(!summary.text.includes("구현_작업"));
   const noAlias = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", focus_task: "구현_작업" }, { statusReader: async () => status });
   assert.equal(noAlias.steps[0].task, "Subtask");
   const invalidAlias = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", focus_task: "구현_작업", task_labels: { 구현_작업: "잘못된 별칭" } }, { statusReader: async () => status });
-  assert.equal(invalidAlias.text, "GPT-5.6-Sol/high (sub) Subtask [worker-skill]");
+  assert.equal(invalidAlias.text, "GPT-5.6-Sol/high (sub) Subtask\n- worker-skill");
   const hook = await observeActivity({ ...input("SubagentStart"), agent_id: WORKER }, new Map(), { statusReader: async () => status });
   assert.match(hook.systemMessage, /GPT-5.6-Sol\/high \(sub\) Subtask \[worker-skill\]/);
   assert(!/[가-힣]/u.test([snapshot.text, focused.text, summary.text, noAlias.text, invalidAlias.text, hook.systemMessage].join(" ")));
@@ -287,7 +313,7 @@ test("SubagentStart waits for exact worker metadata before showing a route", asy
   assert(!visible.systemMessage.includes("requested gpt-5.6-sol/high"));
 });
 
-test("bounded presentation reports omitted work while snapshot retains all steps and skills", async () => {
+test("full text and markdown retain all tasks and skill reads while compact line stays bounded", async () => {
   const owner = turn(TURN, "native_turn_completed", [], "2026-09-20T01:00:00Z");
   owner.completed_at = "2026-09-20T02:00:00Z";
   const workers = Array.from({ length: 7 }, (_, index) => {
@@ -303,11 +329,18 @@ test("bounded presentation reports omitted work while snapshot retains all steps
   const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary" }, { statusReader: async () => status });
   assert.equal(snapshot.steps.length, 8);
   assert.equal(snapshot.steps[1].skills.length, 4);
-  assert.match(snapshot.markdown, /2 more tasks/);
-  assert.match(snapshot.markdown, /Skill lists were shortened/);
+  assert.equal(snapshot.text.match(/parallel task/g).length, 7);
+  assert.equal(snapshot.markdown.match(/parallel task/g).length, 7);
+  assert.equal(snapshot.text.match(/- four/g).length, 7);
+  assert.equal(snapshot.markdown.match(/- four/g).length, 7);
+  assert.match(snapshot.line, /2 more tasks/);
+  assert.match(snapshot.line, /Skill list shortened/);
+  assert.doesNotMatch(snapshot.text, /more tasks|shortened|\+1|\[/);
+  assert.doesNotMatch(snapshot.markdown, /more tasks|shortened|\+1|\\\[/);
   assert(snapshot.markdown.includes("parallel task \\- state unavailable"));
   assert.match(snapshot.markdown, /Partial coverage/);
-  assert(snapshot.markdown.split("\n").every((line) => line.startsWith(">")));
+  assert(snapshot.text.includes("\n\nGPT-6-Astra/xhigh (sub) parallel task"));
+  assert(snapshot.markdown.includes("\n\nGPT\\-6\\-Astra\\/xhigh \\(sub\\) parallel task"));
 });
 
 function input(hook_event_name) { return { session_id: SESSION, turn_id: TURN, hook_event_name, model: "gpt-5.6-sol" }; }
