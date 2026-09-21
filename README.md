@@ -18,7 +18,7 @@ Mallo makes model and task activity easier to read in Codex. See the recorded mo
 
 Mallo reads existing local Codex history. It needs no separate model or API key; checkpoints use the current task's normal tokens.
 
-The first release supports **Codex Desktop and CLI**.
+Supports **Codex Desktop and CLI**. Get the [latest release](https://github.com/JIwongeun/mallo/releases/latest).
 
 ## What you see
 

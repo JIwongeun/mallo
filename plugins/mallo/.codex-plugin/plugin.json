@@ -1,6 +1,6 @@
 {
   "name": "mallo",
-  "version": "0.3.2+codex.20260921105936",
+  "version": "0.3.2",
   "mcpServers": "./.mcp.json",
   "description": "See models, effort, and skill reads.",
   "author": {
