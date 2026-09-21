@@ -77,7 +77,7 @@ test("MCP exposes only read-only activity tools", async (t) => {
   const client = startClient(transcriptRoot);
   t.after(() => client.close());
   const initialized = await client.call("initialize", { protocolVersion: "2026-01-26", capabilities: {}, clientInfo: { name: "test", version: "1" } });
-  assert.equal(initialized.serverInfo.version, "0.3.2");
+  assert.equal(initialized.serverInfo.version, "0.3.3");
   const listed = await client.call("tools/list", {});
   assert.deepEqual(listed.tools.map((tool) => tool.name), ["show_activity", "task_summary", "list_activity", "observe_activity"]);
   assert(listed.tools.every((tool) => tool.annotations.readOnlyHint === true));
