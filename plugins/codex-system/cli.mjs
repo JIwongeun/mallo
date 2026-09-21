@@ -11,15 +11,15 @@ export async function main(argv = process.argv.slice(2)) {
     return print(flags.json ? await listSessions() : formatSessions(await listSessions()), flags.json);
   }
   if (!["status", "watch"].includes(command)) throw new Error("Usage: mallo <status|watch> --session <id> [--json]");
-  validateFlags(flags, command === "status" ? ["session", "json", "view", "phase", "turn", "format"] : ["session", "json", "interval"]);
+  validateFlags(flags, command === "status" ? ["session", "json", "view", "phase", "turn", "focus-task", "format"] : ["session", "json", "interval"]);
   const sessionId = requiredFlag(flags, "session");
   if (command === "status" && flags.view === "current") {
     if ("format" in flags && !["plain", "markdown"].includes(flags.format)) throw new Error("--format must be plain or markdown");
-    const snapshot = await currentActivity({ session_id: sessionId, phase: requiredFlag(flags, "phase"), turn_id: flags.turn });
+    const snapshot = await currentActivity({ session_id: sessionId, phase: requiredFlag(flags, "phase"), turn_id: flags.turn, focus_task: flags["focus-task"] });
     return print(flags.json ? snapshot : flags.format === "markdown" ? snapshot.markdown : snapshot.line, flags.json);
   }
   if (command === "status") {
-    if (flags.view !== undefined || flags.phase !== undefined || flags.turn !== undefined || "format" in flags) throw new Error("--phase, --turn, and --format require --view current");
+    if (flags.view !== undefined || flags.phase !== undefined || flags.turn !== undefined || flags["focus-task"] !== undefined || "format" in flags) throw new Error("--phase, --turn, --focus-task, and --format require --view current");
     return print(flags.json ? await getStatus(sessionId) : formatStatus(await getStatus(sessionId)), flags.json);
   }
   return watch(sessionId, flags);

@@ -57,10 +57,16 @@ test("MCP exposes only read-only activity tools", async (t) => {
   const client = startClient(transcriptRoot);
   t.after(() => client.close());
   const initialized = await client.call("initialize", { protocolVersion: "2026-01-26", capabilities: {}, clientInfo: { name: "test", version: "1" } });
-  assert.equal(initialized.serverInfo.version, "0.3.1");
+  assert.equal(initialized.serverInfo.version, "0.3.2");
   const listed = await client.call("tools/list", {});
-  assert.deepEqual(listed.tools.map((tool) => tool.name), ["show_activity", "list_activity", "observe_activity"]);
+  assert.deepEqual(listed.tools.map((tool) => tool.name), ["show_activity", "task_summary", "list_activity", "observe_activity"]);
   assert(listed.tools.every((tool) => tool.annotations.readOnlyHint === true));
+  assert.equal(listed.tools[0].title, "Show activity");
+  assert.equal(listed.tools[0].annotations.title, "Show activity");
+  assert.equal(listed.tools[1].title, "Task summary");
+  assert.equal(listed.tools[1].annotations.title, "Task summary");
+  assert.equal(listed.tools[0].inputSchema.properties.focus_task.maxLength, 160);
+  assert.equal(listed.tools[0].inputSchema.properties.task_labels.maxProperties, 32);
   const sessions = await client.call("tools/call", { name: "list_activity", arguments: {} });
   assert.equal(sessions.structuredContent.sessions[0].session_id, ROOT);
   const shown = await client.call("tools/call", { name: "show_activity", arguments: { session_id: ROOT } });
@@ -69,7 +75,7 @@ test("MCP exposes only read-only activity tools", async (t) => {
   assert(shown.content[0].text.includes("Native state"));
   const compact = await client.call("tools/call", { name: "show_activity", arguments: { session_id: ROOT, view: "current", phase: "summary", turn_id: TURN } });
   assert(!("structuredContent" in compact));
-  assert.match(compact.content[0].text, /^Mallo 작업요약/m);
+  assert.match(compact.content[0].text, /^GPT-5.6-Sol\/high \(main\) Main task$/m);
   assert(!compact.content[0].text.includes("> **"));
   assert(!compact.content[0].text.includes("|---|"));
   for (const privateValue of ["SECRET_PROMPT", "SECRET_ARGUMENT", "SECRET_RESULT", transcriptRoot]) assert(!JSON.stringify(compact).includes(privateValue));
@@ -77,13 +83,23 @@ test("MCP exposes only read-only activity tools", async (t) => {
   assert.equal(cliJson.status, 0, cliJson.stderr);
   const snapshot = JSON.parse(cliJson.stdout);
   assert.equal(compact.content[0].text, snapshot.text);
+  const finalSummary = await client.call("tools/call", { name: "task_summary", arguments: { session_id: ROOT, turn_id: TURN, task_labels: { main: "Transport check" } } });
+  const legacySummary = await client.call("tools/call", { name: "show_activity", arguments: { session_id: ROOT, view: "current", phase: "summary", turn_id: TURN, task_labels: { main: "Transport check" } } });
+  assert.equal(finalSummary.content[0].text, legacySummary.content[0].text);
+  assert.match(finalSummary.content[0].text, /^GPT-5.6-Sol\/high \(main\) Transport check$/);
+  assert(!("structuredContent" in finalSummary));
+  const labeled = await client.call("tools/call", { name: "show_activity", arguments: { session_id: ROOT, view: "current", phase: "progress", turn_id: TURN, task_labels: { main: "Transport check", unknown: "Injected row" } } });
+  assert.match(labeled.content[0].text, /^GPT-5.6-Sol\/high \(main\) Transport check$/m);
+  assert(!labeled.content[0].text.includes("Injected row"));
+  const pending = await client.call("tools/call", { name: "show_activity", arguments: { session_id: ROOT, view: "current", phase: "progress", turn_id: TURN, focus_task: "new_worker", task_labels: { new_worker: "New worker" } } });
+  assert.match(pending.content[0].text, /^New worker observation pending$/);
   const cliCompact = spawnSync(process.execPath, [cliPath, "status", "--session", ROOT, "--view", "current", "--phase", "summary", "--turn", TURN], { encoding: "utf8", env: { ...process.env, MALLO_TRANSCRIPT_ROOTS: transcriptRoot } });
   assert.equal(cliCompact.status, 0, cliCompact.stderr);
   assert.equal(cliCompact.stdout.trim(), snapshot.line);
   const cliMarkdown = spawnSync(process.execPath, [cliPath, "status", "--session", ROOT, "--view", "current", "--phase", "summary", "--turn", TURN, "--format", "markdown"], { encoding: "utf8", env: { ...process.env, MALLO_TRANSCRIPT_ROOTS: transcriptRoot } });
   assert.equal(cliMarkdown.status, 0, cliMarkdown.stderr);
   assert.equal(cliMarkdown.stdout.trim(), snapshot.markdown);
-  assert.match(snapshot.markdown, /^> \*\*Mallo 작업요약\*\*/);
+  assert(snapshot.markdown.startsWith("> GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task"));
   assert(snapshot.markdown.split("\n").every((line) => line.startsWith(">")));
   const malformed = await client.call("tools/call", { name: "show_activity", arguments: { session_id: "latest" } });
   assert.equal(malformed.isError, true);
@@ -93,6 +109,18 @@ test("MCP exposes only read-only activity tools", async (t) => {
   assert.equal(strayPhase.isError, true);
   const invalidTurn = await client.call("tools/call", { name: "show_activity", arguments: { session_id: ROOT, view: "current", phase: "progress", turn_id: "latest" } });
   assert.equal(invalidTurn.isError, true);
+  const invalidLabels = await client.call("tools/call", { name: "show_activity", arguments: { session_id: ROOT, view: "current", phase: "progress", task_labels: [] } });
+  assert.equal(invalidLabels.isError, true);
+  for (const argumentsValue of [
+    { session_id: ROOT, phase: "progress" },
+    { session_id: ROOT, focus_task: "main" },
+    { session_id: ROOT, view: "current" },
+    { session_id: ROOT, turn_id: "latest" },
+    { session_id: ROOT, task_labels: [] },
+  ]) {
+    const invalidSummary = await client.call("tools/call", { name: "task_summary", arguments: argumentsValue });
+    assert.equal(invalidSummary.isError, true);
+  }
   const concurrent = await Promise.all(Array.from({ length: 6 }, () => client.call("tools/call", { name: "show_activity", arguments: { session_id: ROOT } })));
   assert(concurrent.every((result) => result.structuredContent.history.length === 1));
   const observed = await client.call("tools/call", { name: "observe_activity", arguments: { session_id: ROOT, turn_id: TURN, hook_event_name: "Stop", model: "ignored-secret-free" } });
@@ -117,12 +145,14 @@ test("CLI requires an explicit status session and reads isolated roots", async (
   const compact = spawnSync(process.execPath, [cliPath, "status", "--session", ROOT, "--view", "current", "--phase", "progress", "--json"], { encoding: "utf8", env });
   assert.equal(compact.status, 0, compact.stderr);
   assert.deepEqual(Object.keys(JSON.parse(compact.stdout)), ["schema_version", "thread_id", "turn_id", "native_state", "coverage", "steps", "line", "text", "markdown"]);
-  assert.deepEqual(JSON.parse(compact.stdout).steps.map((step) => step.task), ["대화 작업"]);
+  assert.deepEqual(JSON.parse(compact.stdout).steps.map((step) => step.task), ["Main task"]);
   for (const args of [
     ["status", "--session", ROOT, "--view", "current"],
     ["status", "--session", ROOT, "--view", "current", "--phase", "later"],
     ["status", "--session", ROOT, "--view", "current", "--phase", "progress", "--format", "html"],
     ["status", "--session", ROOT, "--view", "current", "--phase", "progress", "--format"],
+    ["status", "--session", ROOT, "--focus-task", "worker"],
+    ["status", "--session", ROOT, "--view", "current", "--phase", "summary", "--focus-task", "worker"],
     ["status", "--session", ROOT, "--bogus", "value"],
     ["status", "--session", ROOT, "--phase", "progress"],
   ]) {

@@ -35,7 +35,7 @@ node --test "test/*.test.mjs"
 - Do not inject model context, block work, route models, or continue tasks.
 - Keep MCP on stdio; do not add a server or background service.
 - Preserve compatibility identifier `codex-system@personal`.
-- Keep user output compact and preserve the fixed `Mallo 작업요약` heading.
+- Keep native progress and `Task summary` tool results compact, with headerless English task rows. Do not repeat the summary in the assistant answer.
 - Add one focused test for new non-trivial logic.
 
 ## Pull requests

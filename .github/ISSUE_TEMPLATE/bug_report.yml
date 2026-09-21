@@ -10,7 +10,7 @@ body:
     id: mallo-version
     attributes:
       label: Mallo version or commit
-      placeholder: 0.3.0 or commit SHA
+      placeholder: 0.3.2 or commit SHA
     validations:
       required: true
   - type: input
@@ -32,8 +32,8 @@ body:
     attributes:
       label: Affected surface
       options:
-        - Codex Desktop MCP checkpoints
-        - Codex Desktop final summary
+        - Codex Desktop Show activity
+        - Codex Desktop Task summary
         - Codex CLI hooks
         - CLI diagnostics
         - Installation or discovery

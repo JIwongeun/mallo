@@ -18,17 +18,20 @@ export async function currentActivity(input, options = {}) {
   if (!agent || !turn) return unavailableSnapshot(input);
 
   const current = { ...turn, thread_id: agent.thread_id, role: agent.role, task_label: agent.task_label };
-  const steps = scopedSteps(status, current);
+  const focused = input.phase === "progress" ? focusedStep(status, current, input.focus_task, input.task_labels) : null;
+  if (input.phase === "progress" && input.focus_task && !focused) return pendingSnapshot(input, status.coverage.state);
+  const steps = input.phase === "summary" ? scopedSteps(status, current, input.task_labels) : [focused ?? labeledStep(agent, current, input.task_labels)];
+  const displayCurrent = input.phase === "progress" ? steps[0] : current;
   return {
     schema_version: 1,
     thread_id: input.session_id,
-    turn_id: current.turn_id,
-    native_state: current.state,
+    turn_id: displayCurrent.turn_id ?? current.turn_id,
+    native_state: displayCurrent.state ?? current.state,
     coverage: status.coverage.state,
     steps,
-    line: formatLine(input.phase, current, steps, status.coverage.state),
-    text: formatText(steps, status.coverage.state, input.phase),
-    markdown: formatMarkdown(steps, status.coverage.state, input.phase),
+    line: formatLine(input.phase, displayCurrent, steps, status.coverage.state),
+    text: formatText(steps, status.coverage.state),
+    markdown: formatMarkdown(steps, status.coverage.state),
   };
 }
 
@@ -36,24 +39,23 @@ export async function observeActivity(input, memory = new Map(), options = {}) {
   if (!validInput(input)) return {};
   let status;
   try { status = await (options.statusReader ?? getStatus)(input.session_id, options); }
-  catch { return changed(memory, input, `Mallo · 관찰 불가 · ${safe(input.model) ?? "model 확인 불가"}/effort 확인 불가`); }
+  catch { return changed(memory, input, `Mallo · Activity unavailable · ${modelDisplayName(safe(input.model) ?? "model unknown")}/effort unknown`); }
 
   const found = status.history.find((turn) => turn.turn_id === input.turn_id) ?? null;
   const agent = found && status.agents.find((candidate) => candidate.thread_id === found.thread_id);
   const current = found ? { ...found, task_label: agent?.task_label } : null;
-  const workers = scopedHookWorkers(status, current, input.agent_id);
-  const model = current?.model?.value ?? safe(input.model) ?? "model 확인 불가";
-  const effort = current?.effort?.value ?? "effort 확인 대기";
-  const skills = scopedSkills(current, workers);
-  const pieces = [`Mallo · ${eventState(input.hook_event_name, current)}`, `${current ? current.role : "활성 모델(훅)"} ${model}/${effort}`];
-  if (workers.length) pieces.push(formatHookWorkers(workers));
-  else if (input.hook_event_name === "SubagentStart" && input.agent_id) pieces.push("worker 시작 관찰 대기");
-  pieces.push(formatHookSkills(skills, current, status.coverage.state));
-  if (["Stop", "Interrupt"].includes(input.hook_event_name) && current) pieces.push(`이번 turn 도구 ${current.tool_summary.completed}/${current.tool_summary.total}`);
+  const target = hookStep(status, current, input);
+  const model = current?.model?.value ?? safe(input.model) ?? "model unknown";
+  const effort = current?.effort?.value ?? "effort pending";
+  const pieces = [`Mallo · ${eventState(input.hook_event_name, current)}`];
+  if (target) pieces.push(formatStepLine(target));
+  else if (["SubagentStart", "SubagentStop"].includes(input.hook_event_name) && input.agent_id) pieces.push("Worker observation pending");
+  else pieces.push(`${modelDisplayName(model)}/${effort} · Active model (hook)`);
+  if (["Stop", "Interrupt"].includes(input.hook_event_name) && current) pieces.push(`Turn tools ${current.tool_summary.completed}/${current.tool_summary.total}`);
   return changed(memory, input, pieces.join(" · "));
 }
 
-function scopedSteps(status, current) {
+function scopedSteps(status, current, taskLabels) {
   const ownerAgent = status.agents.find((agent) => agent.thread_id === current.thread_id);
   const entries = [{ agent: ownerAgent ?? current, turn: current }];
   if (current.role === "main" && current.started_at) {
@@ -70,25 +72,36 @@ function scopedSteps(status, current) {
   });
   const seen = new Map();
   return entries.map(({ agent, turn }) => {
-    const base = taskName(agent.role ?? turn.role, agent.task_label);
+    const base = displayTaskName(agent, turn, taskLabels);
     const count = (seen.get(base) ?? 0) + 1;
     seen.set(base, count);
     return stepView(agent, turn, count === 1 ? base : `${base} (${count})`);
   });
 }
 
-function scopedHookWorkers(status, current, agentId) {
-  const workers = status.agents.filter((agent) => agent.role === "worker");
-  if (agentId) {
-    const exact = workers.find((agent) => agent.thread_id === agentId);
-    const relevant = exact && relevantWorkerTurns(exact, current).at(-1);
-    if (exact && relevant && !(current?.role === "worker" && current.thread_id === exact.thread_id)) return [stepView(exact, relevant)];
+function focusedStep(status, current, focus, taskLabels) {
+  const owner = status.agents.find((agent) => agent.thread_id === current.thread_id);
+  if (!focus || focus === (current.role === "main" ? "main" : current.task_label)) return labeledStep(owner ?? current, current, taskLabels);
+  if (current.role !== "main" || focus === "main") return null;
+  const matches = status.agents
+    .filter((agent) => agent.role === "worker" && agent.task_label === focus)
+    .map((agent) => ({ agent, turns: relevantWorkerTurns(agent, current) }))
+    .filter(({ turns }) => turns.length);
+  if (matches.length !== 1) return null;
+  return labeledStep(matches[0].agent, matches[0].turns.at(-1), taskLabels);
+}
+
+function hookStep(status, current, input) {
+  if (["SubagentStart", "SubagentStop"].includes(input.hook_event_name) && input.agent_id) {
+    const worker = status.agents.find((agent) => agent.role === "worker" && agent.thread_id === input.agent_id);
+    if (!worker) return null;
+    if (current?.role === "worker" && current.thread_id === worker.thread_id) return stepView(worker, current);
+    const turn = relevantWorkerTurns(worker, current).at(-1);
+    return turn ? stepView(worker, turn) : null;
   }
-  if (!current?.started_at || current.role !== "main") return [];
-  return workers.flatMap((agent) => {
-    const turn = relevantWorkerTurns(agent, current).at(-1);
-    return turn ? [stepView(agent, turn)] : [];
-  });
+  if (!current) return null;
+  const owner = status.agents.find((candidate) => candidate.thread_id === current.thread_id);
+  return stepView(owner ?? current, current);
 }
 
 function relevantWorkerTurns(agent, ownerTurn) {
@@ -106,7 +119,7 @@ function stepView(agent, turn, task = taskName(agent.role ?? turn.role, agent.ta
     task,
     thread_id: agent.thread_id ?? turn.thread_id,
     turn_id: turn.turn_id,
-    role: agent.role ?? turn.role ?? "worker",
+    role: displayRole(agent.role ?? turn.role),
     model: displayValue(turn.model?.value, "unknown"),
     effort: displayValue(turn.effort?.value, "unknown"),
     state: displayValue(turn.state, "unknown"),
@@ -114,107 +127,115 @@ function stepView(agent, turn, task = taskName(agent.role ?? turn.role, agent.ta
   };
 }
 
-function scopedSkills(current, workers) {
-  return [...new Set([
-    ...(current?.skills?.items ?? []).map((item) => item.name),
-    ...workers.flatMap((worker) => worker.skills),
-  ].map((name) => displayValue(name, null)).filter((name) => name && isVisibleSkillName(name)))];
+function labeledStep(agent, turn, taskLabels) {
+  return stepView(agent, turn, displayTaskName(agent, turn, taskLabels));
+}
+
+function displayTaskName(agent, turn, taskLabels) {
+  const native = (agent.role ?? turn.role) === "main" ? "main" : agent.task_label;
+  return labelForTask(taskLabels, native) ?? taskName(agent.role ?? turn.role, agent.task_label);
 }
 
 function formatLine(phase, current, steps, coverage) {
-  const preview = steps.slice(0, PREVIEW_LIMIT).map((step, index) => formatStepLine(step, phase, index));
-  if (steps.length > PREVIEW_LIMIT) preview.push(`추가 ${steps.length - PREVIEW_LIMIT}개 작업 있음`);
-  if (steps.some((step) => step.skills.length > SKILL_PREVIEW_LIMIT)) preview.push("축약된 스킬 기록 있음");
-  if (coverage !== "complete") preview.push(coverage === "unavailable" ? "관찰 범위 확인 불가" : "관찰 범위 일부");
+  const preview = steps.slice(0, PREVIEW_LIMIT).map((step) => formatStepLine(step));
+  if (steps.length > PREVIEW_LIMIT) preview.push(`${steps.length - PREVIEW_LIMIT} more tasks`);
+  if (steps.some((step) => step.skills.length > SKILL_PREVIEW_LIMIT)) preview.push("Skill list shortened");
+  if (coverage !== "complete") preview.push(coverage === "unavailable" ? "Coverage unavailable" : "Partial coverage");
   return [`Mallo · ${snapshotState(phase, current)}`, ...preview].join(" · ");
 }
 
-function formatText(steps, coverage, phase) {
-  const lines = ["Mallo 작업요약", ""];
-  for (const [index, step] of steps.slice(0, PREVIEW_LIMIT).entries()) lines.push(formatStepLine(step, phase, index));
+function formatText(steps, coverage) {
+  const lines = [];
+  for (const step of steps.slice(0, PREVIEW_LIMIT)) lines.push(formatStepLine(step));
   const notes = summaryNotes(steps, coverage);
-  if (notes.length) lines.push("", ...notes);
+  if (notes.length) lines.push(...notes);
   return lines.join("\n");
 }
 
-function formatMarkdown(steps, coverage, phase) {
-  const lines = ["> **Mallo 작업요약**", ">"];
-  for (const [index, step] of steps.slice(0, PREVIEW_LIMIT).entries()) {
-    lines.push(`> ${markdownLabel(taskWithState(step, phase, index))} · ${markdownLabel(`${modelAlias(step.model)}/${step.effort}`)} · ${markdownLabel(formatStepSkills(step.skills))}  `);
+function formatMarkdown(steps, coverage) {
+  const lines = [];
+  for (const step of steps.slice(0, PREVIEW_LIMIT)) {
+    lines.push(`> ${markdownLabel(formatStepLine(step))}  `);
   }
   const notes = summaryNotes(steps, coverage);
-  if (notes.length) lines.push(">", ...notes.map((note) => `> ${markdownLabel(note)}`));
+  if (notes.length) lines.push(...notes.map((note) => `> ${markdownLabel(note)}`));
   return lines.join("\n").trimEnd();
 }
 
-function formatStepLine(step, phase = "progress", index = -1) {
-  return `${taskWithState(step, phase, index)} · ${modelAlias(step.model)}/${step.effort} · ${formatStepSkills(step.skills)}`;
+function formatStepLine(step) {
+  const skills = formatStepSkills(step.skills);
+  const role = roleAlias(step.role);
+  return `${modelDisplayName(step.model)}/${step.effort}${role ? ` (${role})` : ""} ${taskWithState(step)}${skills ? ` [${skills}]` : ""}`;
 }
 
-function taskWithState(step, phase, index) {
-  const state = usefulState(step.state, phase === "summary" && index === 0);
-  return state ? `${step.task} (${state})` : step.task;
+function taskWithState(step) {
+  const state = usefulState(step.state);
+  return state ? `${step.task} - ${state}` : step.task;
 }
 
-function usefulState(state, suppressActive = false) {
-  if (state === "active") return suppressActive ? null : "진행 중";
-  if (["failed", "error", "cancelled"].includes(state)) return "실패 기록";
-  if (state !== "native_turn_completed") return "상태 확인 불가";
+function usefulState(state) {
+  if (state === "active") return null;
+  if (["failed", "error", "cancelled"].includes(state)) return "failure recorded";
+  if (state !== "native_turn_completed") return "state unavailable";
   return null;
 }
 
 function formatStepSkills(skills) {
-  if (!skills.length) return "읽기 기록 없음";
+  if (!skills.length) return "";
   return `${skills.slice(0, SKILL_PREVIEW_LIMIT).join(", ")}${skills.length > SKILL_PREVIEW_LIMIT ? ` +${skills.length - SKILL_PREVIEW_LIMIT}` : ""}`;
 }
 
 function summaryNotes(steps, coverage) {
   const notes = detailNotes(steps);
-  if (coverage !== "complete") notes.push(`${coverage === "unavailable" ? "관찰 범위 확인 불가" : "관찰 범위 일부"}.`);
+  if (coverage !== "complete") notes.push(`${coverage === "unavailable" ? "Coverage unavailable" : "Partial coverage"}.`);
   return notes;
 }
 
 function detailNotes(steps) {
   const notes = [];
-  if (steps.length > PREVIEW_LIMIT) notes.push(`추가 ${steps.length - PREVIEW_LIMIT}개 작업이 있습니다. 전체 작업 기록을 요청하면 확인할 수 있습니다.`);
-  if (steps.some((step) => step.skills.length > SKILL_PREVIEW_LIMIT)) notes.push("축약된 스킬 기록이 있습니다. 전체 작업 기록을 요청하면 확인할 수 있습니다.");
+  if (steps.length > PREVIEW_LIMIT) notes.push(`${steps.length - PREVIEW_LIMIT} more tasks. Request the full record to inspect them.`);
+  if (steps.some((step) => step.skills.length > SKILL_PREVIEW_LIMIT)) notes.push("Skill lists were shortened. Request the full record to inspect them.");
   return notes;
 }
 
 function taskName(role, value) {
-  if (role === "main") return "대화 작업";
-  const label = displayValue(value, null);
-  return label ? label.replaceAll("_", " ").replace(/\s+/g, " ").trim() || "보조 작업" : "보조 작업";
+  if (role === "main") return "Main task";
+  const label = displayTaskLabel(value);
+  if (label) return label.replaceAll("_", " ");
+  return role === "worker" ? "Subtask" : "Task";
 }
 
-function formatHookWorkers(workers) {
-  const preview = workers.slice(0, 3).map((worker) => `${worker.task} ${worker.model}/${worker.effort}${usefulState(worker.state) ? ` ${usefulState(worker.state)}` : ""}`);
-  return `${preview.join(", ")}${workers.length > 3 ? ` +${workers.length - 3}` : ""}`;
+function displayRole(value) {
+  return value === "main" || value === "worker" ? value : null;
 }
 
-function formatHookSkills(skills, current, coverage) {
-  if (skills.length) return `스킬 참조 ${skills.slice(0, 3).join(", ")}${skills.length > 3 ? ` +${skills.length - 3}` : ""} (읽기 요청 흔적)`;
-  if (!current || coverage !== "complete") return "스킬 관찰 대기";
-  return "스킬 읽기 요청 관찰 없음";
+function roleAlias(role) {
+  if (role === "main") return "main";
+  if (role === "worker") return "sub";
+  return null;
+}
+
+function labelForTask(labels, native) {
+  return native && Object.hasOwn(labels ?? {}, native) ? displayTaskLabel(labels[native]) : null;
 }
 
 function eventState(event, current) {
-  if (event === "Stop") return current?.state === "native_turn_completed" ? "네이티브 turn 응답 완료" : "응답 종료 시점";
-  if (event === "Interrupt") return "중단 시점";
-  if (event === "SubagentStop") return "worker 종료 시점";
-  if (event === "SubagentStart") return "worker 시작 시점";
-  return current?.state === "native_turn_completed" ? "네이티브 turn 응답 완료" : "진행 중";
+  if (event === "Stop") return current?.state === "native_turn_completed" ? "Native turn completed" : "Response end";
+  if (event === "Interrupt") return "Interrupted";
+  if (event === "SubagentStop") return "Worker stopped";
+  if (event === "SubagentStart") return "Worker started";
+  return current?.state === "native_turn_completed" ? "Native turn completed" : "In progress";
 }
 
 function snapshotState(phase, current) {
-  if (current.state === "native_turn_completed") return `${phase === "summary" ? "마무리 시점" : "최근 기록"} · 네이티브 turn 응답 완료`;
-  if (current.state === "active") return phase === "summary" ? "마무리 시점" : "진행 중";
-  return `${phase === "summary" ? "마무리 시점 · " : ""}네이티브 turn 상태 확인 불가`;
+  if (current.state === "native_turn_completed") return `${phase === "summary" ? "Completion checkpoint" : "Latest record"} · Native turn completed`;
+  if (current.state === "active") return phase === "summary" ? "Completion checkpoint" : "In progress";
+  return `${phase === "summary" ? "Completion checkpoint · " : ""}Native turn state unavailable`;
 }
 
-function modelAlias(model) {
-  if (model === "gpt-6-astra") return "Astra";
-  if (model === "gpt-5.6-sol") return "Sol";
+function modelDisplayName(model) {
+  if (model === "gpt-6-astra") return "GPT-6-Astra";
+  if (model === "gpt-5.6-sol") return "GPT-5.6-Sol";
   return model;
 }
 
@@ -223,7 +244,7 @@ function markdownLabel(value) {
 }
 
 function unavailableSnapshot(input) {
-  const line = `Mallo · ${input.phase === "summary" ? "마무리 시점 · " : ""}관찰 불가`;
+  const line = `Mallo · ${input.phase === "summary" ? "Completion checkpoint · " : ""}Activity unavailable`;
   return {
     schema_version: 1,
     thread_id: input.session_id,
@@ -232,8 +253,23 @@ function unavailableSnapshot(input) {
     coverage: "unavailable",
     steps: [],
     line,
-    text: "Mallo 작업요약\n\n관찰 불가",
-    markdown: "> **Mallo 작업요약**\n>\n> 관찰 불가",
+    text: "Activity unavailable",
+    markdown: "> Activity unavailable",
+  };
+}
+
+function pendingSnapshot(input, coverage) {
+  const task = labelForTask(input.task_labels, input.focus_task) ?? taskName(input.focus_task === "main" ? "main" : "worker", input.focus_task);
+  return {
+    schema_version: 1,
+    thread_id: input.session_id,
+    turn_id: null,
+    native_state: "unavailable",
+    coverage,
+    steps: [],
+    line: `Mallo · Observation pending · ${task}`,
+    text: `${task} observation pending`,
+    markdown: `> ${markdownLabel(task)} observation pending`,
   };
 }
 
@@ -241,6 +277,14 @@ function validateCurrentInput(input) {
   if (!input || typeof input !== "object" || !ID.test(input.session_id ?? "")) throw new Error("current activity requires a valid session_id");
   if (!["progress", "summary"].includes(input.phase)) throw new Error("current activity phase must be progress or summary");
   if (input.turn_id != null && !ID.test(input.turn_id)) throw new Error("current activity turn_id must be a native UUID");
+  if (input.focus_task != null) {
+    if (input.phase !== "progress") throw new Error("current activity focus_task requires phase progress");
+    if (!displayValue(input.focus_task, null)) throw new Error("current activity focus_task must be a safe native task label");
+  }
+  if (input.task_labels != null) {
+    if (typeof input.task_labels !== "object" || Array.isArray(input.task_labels) || Object.keys(input.task_labels).length > 32) throw new Error("current activity task_labels must be a small object");
+    // Invalid display aliases are ignored; native task keys remain available for exact lookup.
+  }
 }
 
 function changed(memory, input, line) {
@@ -263,6 +307,10 @@ function validInput(input) {
 
 function displayValue(value, fallback) {
   return typeof value === "string" && value.length > 0 && value.length <= 160 && !/[\u0000-\u001f\u007f-\u009f]/u.test(value) ? value : fallback;
+}
+
+function displayTaskLabel(value) {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= 80 && /^[\x20-\x7e]+$/u.test(value) ? value.replace(/\s+/g, " ").trim() : null;
 }
 
 function safe(value) { return displayValue(value, null); }

@@ -1,26 +1,26 @@
 {
   "name": "codex-system",
-  "version": "0.3.1",
+  "version": "0.3.2+codex.20260921070423",
   "mcpServers": "./.mcp.json",
-  "description": "Mallo shows models, effort and referenced skills for each Codex task, with native progress logs and a readable work summary.",
+  "description": "See models, effort, and skill reads in Codex.",
   "author": {
     "name": "JIwongeun"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Mallo",
-    "shortDescription": "See which models and skills helped with your work",
-    "longDescription": "Mallo reads native Codex activity, linking each observed task to its model, effort and skill references. Progress stays in native tool logs; a fixed blockquote ends the answer without a separate reporting model.",
+    "shortDescription": "See models, effort, and skill reads in Codex",
+    "longDescription": "Mallo shows observed model, effort, task, and skill reads as work happens, then summarizes the native turn in Codex activity logs. It reads local transcripts and needs no extra model or API key.",
     "developerName": "JIwongeun",
     "category": "Productivity",
     "capabilities": [
-      "App progress through the Mallo skill",
+      "Native progress and completion logs through the Mallo skill",
       "Compact native activity snapshots",
       "Completed-turn history",
       "CLI status and watch"
     ],
     "defaultPrompt": [
-      "Use $mallo to show progress and a final activity summary while doing this task.",
+      "Use $mallo for focused Show activity checkpoints and one Task summary native tool log after this task's work is complete.",
       "List sessions available to Mallo."
     ],
     "brandColor": "#6D5BD0",

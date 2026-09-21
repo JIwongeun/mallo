@@ -11,35 +11,55 @@ test("immediate prompt uses hook model without leaking a stale turn", async () =
   const memory = new Map();
   const status = fixtureStatus({ includeCurrent: false });
   const output = await observeActivity(input("UserPromptSubmit"), memory, { statusReader: async () => status });
-  assert.match(output.systemMessage, /활성 모델\(훅\) gpt-5\.6-sol\/effort 확인 대기/);
-  assert.match(output.systemMessage, /스킬 관찰 대기/);
+  assert.match(output.systemMessage, /GPT-5\.6-Sol\/effort pending · Active model \(hook\)/);
+  assert(!output.systemMessage.includes("Skill reads"));
   assert(!output.systemMessage.includes("old-skill"));
   assert.deepEqual(await observeActivity(input("UserPromptSubmit"), memory, { statusReader: async () => status }), {});
+});
+
+test("display names leave unknown and versioned model IDs and raw metadata unchanged", async () => {
+  for (const model of ["vendor/model-v2", "gpt-6-astra-2026-09-21", "gpt-5.6-sol-2026-09-21"]) {
+    const status = fixtureStatus();
+    status.agents[0].turns.at(-1).model.value = model;
+    const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary" }, { statusReader: async () => status });
+    assert.equal(snapshot.steps[0].model, model);
+    assert(snapshot.text.startsWith(`${model}/xhigh`));
+    assert.equal(status.history.at(-1).model.value, model);
+    const hook = await observeActivity(input("PostToolUse"), new Map(), { statusReader: async () => status });
+    assert(hook.systemMessage.includes(`${model}/xhigh (main)`));
+    const hookOnly = await observeActivity({ ...input("UserPromptSubmit"), model }, new Map(), { statusReader: async () => fixtureStatus({ includeCurrent: false }) });
+    assert(hookOnly.systemMessage.includes(`${model}/effort pending`));
+    const unavailable = await observeActivity({ ...input("PostToolUse"), model }, new Map(), { statusReader: async () => { throw new Error("reader failed"); } });
+    assert(unavailable.systemMessage.includes(`${model}/effort unknown`));
+  }
 });
 
 test("emits only changed current-turn model, skill, and worker state", async () => {
   const memory = new Map();
   let status = fixtureStatus();
   const first = await observeActivity(input("PostToolUse"), memory, { statusReader: async () => status });
-  assert.match(first.systemMessage, /gpt-6-astra\/xhigh/);
-  assert.match(first.systemMessage, /스킬 읽기 요청 관찰 없음/);
+  assert.match(first.systemMessage, /GPT-6-Astra\/xhigh/);
+  assert.match(first.systemMessage, /GPT-6-Astra\/xhigh \(main\) Main task/);
+  assert(!first.systemMessage.includes("Skill reads"));
   assert(!first.systemMessage.includes("old-skill"));
   assert.deepEqual(await observeActivity(input("PostToolUse"), memory, { statusReader: async () => status }), {});
 
   status = fixtureStatus({ skills: ["model-reasoning-router"], worker: "active" });
   const changed = await observeActivity(input("PostToolUse"), memory, { statusReader: async () => status });
-  assert.match(changed.systemMessage, /스킬 참조 model-reasoning-router/);
-  assert.match(changed.systemMessage, /보조 작업 gpt-6-astra\/xhigh 진행 중/);
+  assert.match(changed.systemMessage, /GPT-6-Astra\/xhigh \(main\) Main task \[model-reasoning-router\]/);
+  assert(!changed.systemMessage.includes("Subtask"));
 });
 
-test("Stop labels response end and keeps pending workers", async () => {
+test("Stop labels the owner response end without aggregating workers", async () => {
   const memory = new Map();
   const status = fixtureStatus({ worker: "active", tools: { total: 3, completed: 2, failed: 1 } });
   const stopped = await observeActivity(input("Stop"), memory, { statusReader: async () => status });
-  assert.match(stopped.systemMessage, /응답 종료 시점/);
-  assert.match(stopped.systemMessage, /보조 작업 gpt-6-astra\/xhigh 진행 중/);
-  assert.match(stopped.systemMessage, /이번 turn 도구 2\/3/);
-  assert(!stopped.systemMessage.includes("성공"));
+  assert.match(stopped.systemMessage, /Response end/);
+  assert.match(stopped.systemMessage, /GPT-6-Astra\/xhigh \(main\) Main task/);
+  assert(!stopped.systemMessage.includes("Skill reads"));
+  assert(!stopped.systemMessage.includes("Subtask"));
+  assert.match(stopped.systemMessage, /Turn tools 2\/3/);
+  assert(!stopped.systemMessage.includes("success"));
   assert.deepEqual(await observeActivity(input("Stop"), memory, { statusReader: async () => status }), {});
 });
 
@@ -70,21 +90,40 @@ test("current view keeps every in-window reused-worker turn while hooks stay per
   };
 
   const mainOutput = await observeActivity(input("Stop"), memory, { statusReader: async () => status });
-  assert.match(mainOutput.systemMessage, /code implementation custom-model\/medium/);
-  assert.match(mainOutput.systemMessage, /second-skill/);
+  assert.match(mainOutput.systemMessage, /GPT-6-Astra\/xhigh \(main\) Main task/);
+  assert(!mainOutput.systemMessage.includes("second-skill"));
   assert(!mainOutput.systemMessage.includes("worker-skill"));
   assert(!mainOutput.systemMessage.includes("unrelated-skill"));
 
   const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary" }, { statusReader: async () => status });
   assert.deepEqual(snapshot.steps.map((step) => [step.task, step.model, step.effort, step.skills]), [
-    ["대화 작업", "gpt-6-astra", "xhigh", []],
+    ["Main task", "gpt-6-astra", "xhigh", []],
     ["code implementation", "gpt-5.6-sol", "high", ["worker-skill"]],
     ["code implementation (2)", "custom-model", "medium", ["second-skill"]],
   ]);
   assert(!JSON.stringify(snapshot).includes("unrelated-skill"));
 
+  const focused = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", focus_task: "code_implementation" }, { statusReader: async () => status });
+  assert.deepEqual(focused.steps.map((step) => [step.turn_id, step.model, step.skills]), [
+    [second.turn_id, "custom-model", ["second-skill"]],
+  ]);
+
+  const duplicate = {
+    thread_id: "019d3000-0000-7000-8000-000000000099",
+    role: "worker",
+    task_label: "code_implementation",
+    turns: [turn("019d3000-0000-7000-8000-000000000098", "native_turn_completed", ["outside-skill"], "2026-09-20T03:00:00Z")],
+  };
+  status.agents.push(duplicate);
+  const ignoresOutsideWindow = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", focus_task: "code_implementation" }, { statusReader: async () => status });
+  assert.equal(ignoresOutsideWindow.steps[0].turn_id, second.turn_id);
+  duplicate.turns[0].started_at = "2026-09-20T01:15:00Z";
+  const ambiguous = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", focus_task: "code_implementation" }, { statusReader: async () => status });
+  assert.deepEqual(ambiguous.steps, []);
+  assert.match(ambiguous.text, /code implementation observation pending/);
+
   const workerOutput = await observeActivity({ ...input("SubagentStop"), session_id: WORKER, turn_id: relevant.turn_id, agent_id: WORKER }, new Map(), { statusReader: async () => status });
-  assert.match(workerOutput.systemMessage, /worker gpt-5\.6-sol\/high/);
+  assert.match(workerOutput.systemMessage, /GPT-5.6-Sol\/high \(sub\) code implementation \[worker-skill\]/);
   const workerSnapshot = await currentActivity({ session_id: WORKER, turn_id: relevant.turn_id, phase: "summary" }, { statusReader: async () => status });
   assert.deepEqual(workerSnapshot.steps.map((step) => step.turn_id), [relevant.turn_id]);
 });
@@ -92,22 +131,25 @@ test("current view keeps every in-window reused-worker turn while hooks stay per
 test("observer fails open and rejects control-character labels", async () => {
   const memory = new Map();
   const unavailable = await observeActivity(input("PostToolUse"), memory, { statusReader: async () => { throw new Error("SECRET_FAILURE"); } });
-  assert.match(unavailable.systemMessage, /관찰 불가/);
+  assert.match(unavailable.systemMessage, /Activity unavailable/);
+  assert.match(unavailable.systemMessage, /GPT-5\.6-Sol\/effort unknown/);
   assert(!unavailable.systemMessage.includes("SECRET_FAILURE"));
   assert.deepEqual(await observeActivity({ ...input("PostToolUse"), model: "safe\u001b[31m" }, memory, { statusReader: async () => fixtureStatus() }), {});
   const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary" }, { statusReader: async () => { throw new Error("SECRET_FAILURE"); } });
-  assert.equal(snapshot.text, "Mallo 작업요약\n\n관찰 불가");
-  assert.equal(snapshot.markdown, "> **Mallo 작업요약**\n>\n> 관찰 불가");
+  assert.equal(snapshot.text, "Activity unavailable");
+  assert.equal(snapshot.markdown, "> Activity unavailable");
 });
 
 test("compact presentation hides only self reads and escapes untrusted Markdown labels", async () => {
   const selfOnly = fixtureStatus({ skills: ["MALLO", "Codex-System:Mallo"], worker: "active", workerSkills: ["mallo"] });
   const selfSnapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress" }, { statusReader: async () => selfOnly });
   assert.equal(selfSnapshot.steps[0].skills.length, 0);
-  assert.match(selfSnapshot.text, /읽기 기록 없음/);
+  assert.match(selfSnapshot.text, /GPT-6-Astra\/xhigh \(main\) Main task/);
+  assert(!selfSnapshot.text.includes("Skill reads"));
   assert(!selfSnapshot.line.includes("Codex-System:Mallo"));
   const selfHook = await observeActivity(input("PostToolUse"), new Map(), { statusReader: async () => selfOnly });
-  assert.match(selfHook.systemMessage, /스킬 읽기 요청 관찰 없음/);
+  assert.match(selfHook.systemMessage, /GPT-6-Astra\/xhigh \(main\) Main task/);
+  assert(!selfHook.systemMessage.includes("Skill reads"));
   assert(!selfHook.systemMessage.includes("Codex-System:Mallo"));
   assert(selfOnly.agents[0].turns.at(-1).skills.items.some((item) => item.name === "MALLO"));
   assert(selfOnly.agents[1].turns.at(-1).skills.items.some((item) => item.name === "mallo"));
@@ -122,22 +164,125 @@ test("compact presentation hides only self reads and escapes untrusted Markdown 
   assert(snapshot.markdown.includes("mallo\\-helper"));
   assert(!snapshot.markdown.includes("](https://"));
   assert(!snapshot.text.includes("> **"));
-  assert(!snapshot.markdown.includes("대화 작업 \\(진행 중\\)"));
-  for (const value of [snapshot.markdown, snapshot.text]) assert.doesNotMatch(value, /작업 · 모델\/effort · 참고 스킬|표시 순서는|스킬은 읽기 요청/);
+  assert(!snapshot.markdown.includes("Main task \\(In progress\\)"));
+  for (const value of [snapshot.markdown, snapshot.text]) assert.doesNotMatch(value, /display order|skills prove application/i);
   assert(snapshot.markdown.split("\n").every((line) => line.startsWith(">")));
   assert(!snapshot.markdown.includes("|---|"));
 });
 
-test("summary uses the fixed blockquote shape", async () => {
+test("summary uses headerless task rows", async () => {
   const status = fixtureStatus({ completed: true, skills: ["caveman", "ponytail"] });
   status.agents[0].turns.at(-1).model.value = "gpt-5.6-sol";
   status.agents[0].turns.at(-1).effort.value = "high";
   const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary" }, { statusReader: async () => status });
   assert.equal(snapshot.markdown, [
-    "> **Mallo 작업요약**",
-    ">",
-    "> 대화 작업 · Sol\\/high · caveman\\, ponytail",
+    "> GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task \\[caveman\\, ponytail\\]",
   ].join("\n"));
+});
+
+test("missing native role does not invent a main or sub marker", async () => {
+  const status = fixtureStatus({ skills: ["caveman"] });
+  status.agents[0].role = undefined;
+  status.history.at(-1).role = undefined;
+  const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress" }, { statusReader: async () => status });
+  assert.equal(snapshot.steps[0].role, null);
+  assert.equal(snapshot.text, "GPT-6-Astra/xhigh Task [caveman]");
+  assert(!/\((?:main|sub)\)/.test(snapshot.line));
+});
+
+test("current view uses English aliases for native task keys and ignores invalid aliases", async () => {
+  const status = fixtureStatus({ skills: ["main-skill"], worker: "active", workerSkills: ["worker-skill"] });
+  status.agents[1].task_label = "구현_작업";
+  status.agents[1].turns[0].model = { value: "gpt-5.6-sol" };
+  status.agents[1].turns[0].effort = { value: "high" };
+  const snapshot = await currentActivity({
+    session_id: SESSION,
+    turn_id: TURN,
+    phase: "progress",
+    task_labels: {
+      main: "Requirements <review>",
+      구현_작업: "Implementation](https://labels.invalid)",
+      unknown_worker: "Pending task",
+    },
+  }, { statusReader: async () => status });
+
+  assert.equal(snapshot.text.split("\n", 1)[0], "GPT-6-Astra/xhigh (main) Requirements <review> [main-skill]");
+  assert.deepEqual(snapshot.steps.map((step) => [step.task, step.model, step.effort, step.skills]), [
+    ["Requirements <review>", "gpt-6-astra", "xhigh", ["main-skill"]],
+  ]);
+  const focused = await currentActivity({
+    session_id: SESSION,
+    turn_id: TURN,
+    phase: "progress",
+    focus_task: "구현_작업",
+    task_labels: { 구현_작업: "Implementation](https://labels.invalid)" },
+  }, { statusReader: async () => status });
+  assert.deepEqual(focused.steps.map((step) => [step.task, step.model, step.effort, step.skills]), [
+    ["Implementation](https://labels.invalid)", "gpt-5.6-sol", "high", ["worker-skill"]],
+  ]);
+  assert(!JSON.stringify(snapshot).includes("Pending task"));
+  assert(snapshot.markdown.includes("Requirements \\<review\\>"));
+  assert(!focused.markdown.includes("](https://labels.invalid)"));
+
+  const summary = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary", task_labels: { 구현_작업: "Implementation review" } }, { statusReader: async () => status });
+  assert.match(summary.text, /GPT-5.6-Sol\/high \(sub\) Implementation review \[worker-skill\]/);
+  assert(!summary.text.includes("구현_작업"));
+  const noAlias = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", focus_task: "구현_작업" }, { statusReader: async () => status });
+  assert.equal(noAlias.steps[0].task, "Subtask");
+  const invalidAlias = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", focus_task: "구현_작업", task_labels: { 구현_작업: "잘못된 별칭" } }, { statusReader: async () => status });
+  assert.equal(invalidAlias.text, "GPT-5.6-Sol/high (sub) Subtask [worker-skill]");
+  const hook = await observeActivity({ ...input("SubagentStart"), agent_id: WORKER }, new Map(), { statusReader: async () => status });
+  assert.match(hook.systemMessage, /GPT-5.6-Sol\/high \(sub\) Subtask \[worker-skill\]/);
+  assert(!/[가-힣]/u.test([snapshot.text, focused.text, summary.text, noAlias.text, invalidAlias.text, hook.systemMessage].join(" ")));
+
+  const pending = await currentActivity({
+    session_id: SESSION,
+    turn_id: TURN,
+    phase: "progress",
+    focus_task: "unknown_worker",
+    task_labels: { unknown_worker: "Pending task" },
+  }, { statusReader: async () => status });
+  assert.deepEqual(pending.steps, []);
+  assert.match(pending.text, /Pending task observation pending/);
+  await assert.rejects(
+    currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary", focus_task: "main" }, { statusReader: async () => status }),
+    /focus_task requires phase progress/,
+  );
+  for (const focus_task of ["bad\nfocus", "x".repeat(161)]) {
+    await assert.rejects(
+      currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", focus_task }, { statusReader: async () => status }),
+      /focus_task/,
+    );
+  }
+
+  for (const task_labels of [
+    [],
+    Object.fromEntries(Array.from({ length: 33 }, (_, index) => [`unknown_${index}`, "label"])),
+  ]) {
+    await assert.rejects(
+      currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", task_labels }, { statusReader: async () => status }),
+      /task_labels/,
+    );
+  }
+  for (const task_labels of [{ main: "bad\nlabel" }, { main: "x".repeat(81) }, { main: "한국어" }, { main: null }, { "bad\nkey": "label" }]) {
+    const fallback = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress", task_labels }, { statusReader: async () => status });
+    assert.equal(fallback.steps[0].task, "Main task");
+  }
+});
+
+test("SubagentStart waits for exact worker metadata before showing a route", async () => {
+  const pending = fixtureStatus();
+  const waiting = await observeActivity({ ...input("SubagentStart"), agent_id: WORKER }, new Map(), { statusReader: async () => pending });
+  assert.match(waiting.systemMessage, /Worker observation pending/);
+  assert(!waiting.systemMessage.includes("requested"));
+
+  const observed = fixtureStatus({ worker: "active", workerSkills: ["caveman"] });
+  observed.agents[1].task_label = "cli_hook_verification";
+  observed.agents[1].turns[0].model = { value: "gpt-6-astra" };
+  observed.agents[1].turns[0].effort = { value: "xhigh" };
+  const visible = await observeActivity({ ...input("SubagentStart"), agent_id: WORKER }, new Map(), { statusReader: async () => observed });
+  assert.match(visible.systemMessage, /GPT-6-Astra\/xhigh \(sub\) cli hook verification \[caveman\]/);
+  assert(!visible.systemMessage.includes("requested gpt-5.6-sol/high"));
 });
 
 test("bounded presentation reports omitted work while snapshot retains all steps and skills", async () => {
@@ -156,10 +301,10 @@ test("bounded presentation reports omitted work while snapshot retains all steps
   const snapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "summary" }, { statusReader: async () => status });
   assert.equal(snapshot.steps.length, 8);
   assert.equal(snapshot.steps[1].skills.length, 4);
-  assert.match(snapshot.markdown, /추가 2개 작업이 있습니다/);
-  assert.match(snapshot.markdown, /축약된 스킬 기록이 있습니다/);
-  assert(snapshot.markdown.includes("parallel task \\(상태 확인 불가\\)"));
-  assert.match(snapshot.markdown, /관찰 범위 일부/);
+  assert.match(snapshot.markdown, /2 more tasks/);
+  assert.match(snapshot.markdown, /Skill lists were shortened/);
+  assert(snapshot.markdown.includes("parallel task \\- state unavailable"));
+  assert.match(snapshot.markdown, /Partial coverage/);
   assert(snapshot.markdown.split("\n").every((line) => line.startsWith(">")));
 });
 

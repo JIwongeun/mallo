@@ -5,7 +5,7 @@ import { basename, delimiter, isAbsolute, relative, resolve, sep } from "node:pa
 export const STATUS_SCHEMA_VERSION = 1;
 
 const ID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
-const MALLO_TOOLS = new Set(["show_activity", "list_activity", "observe_activity", "mcp__mallo__show_activity", "mcp__mallo__list_activity", "mcp__mallo__observe_activity"]);
+const MALLO_TOOLS = new Set(["show_activity", "task_summary", "list_activity", "observe_activity", "mcp__mallo__show_activity", "mcp__mallo__task_summary", "mcp__mallo__list_activity", "mcp__mallo__observe_activity"]);
 const SELF_SKILLS = new Set(["mallo", "codex-system:mallo"]);
 const headerCache = new Map();
 const transcriptCache = new Map();
@@ -120,14 +120,14 @@ export function formatStatusLine(status) {
   const workers = status.agents.filter((agent) => agent.role === "worker").map((agent) => agent.turns.at(-1)).filter(Boolean);
   const workerModels = [...new Set(workers.map((turn) => `${turn.model?.value ?? "unknown"}/${turn.effort?.value ?? "unknown"}`))];
   const skills = [...new Set(status.agents.flatMap((agent) => agent.turns.at(-1)?.skills.items.map((item) => item.name).filter(isVisibleSkillName) ?? []))];
-  const state = status.session.state === "active" ? "진행 중" : status.session.state === "native_turn_completed" ? "응답 완료" : "확인 불가";
+  const state = status.session.state === "active" ? "In progress" : status.session.state === "native_turn_completed" ? "Response completed" : "State unavailable";
   const parts = [
     `Mallo · ${state}`,
     `main ${main?.model?.value ?? "unknown"}/${main?.effort?.value ?? "unknown"}`,
   ];
   if (workers.length) parts.push(`workers ${workers.length} (${workerModels.join(", ")})`);
-  if (status.current?.current_tool) parts.push(`도구 ${status.current.current_tool.name}`);
-  parts.push(skills.length ? `스킬 참조 ${skills.join(", ")}` : status.coverage.state === "complete" ? "스킬 읽기 요청 관찰 없음" : "스킬 관찰 범위 부족");
+  if (status.current?.current_tool) parts.push(`Tool ${status.current.current_tool.name}`);
+  parts.push(skills.length ? `Skill reads ${skills.join(", ")}` : status.coverage.state === "complete" ? "No skill read observed" : "Skill coverage incomplete");
   return parts.join(" · ");
 }
 

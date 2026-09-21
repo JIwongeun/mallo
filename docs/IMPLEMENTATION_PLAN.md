@@ -13,15 +13,17 @@ Mallo reads existing local Codex transcripts. It does not add model calls, route
 
 ### Codex Desktop
 
-The selected Mallo skill reads compact, read-only snapshots through the plugin's MCP server. Progress appears in native MCP tool-result logs. The final answer ends with one fixed blockquote headed `Mallo 작업요약`, followed by one line per observed task with model, effort, and that task's skill references.
+The selected Mallo skill reads compact, read-only snapshots through the plugin's MCP server. Progress appears in native `Show activity` MCP tool-result logs. Immediately after each worker dispatch, the skill calls `show_activity` before unrelated tools or waiting, using `focus_task` to show only the dispatched task. It passes short English display labels keyed by `main` or an exact safe native worker task label, including non-English native keys. Unknown keys cannot add rows or alter observed fields. Invalid or non-English aliases fall back to a neutral English task name without blocking reporting. An unknown, unobserved, or ambiguous focus returns observation pending. Labels are supplied by the current agent before the call; the reader neither extracts raw prompts nor persists labels. Headerless rows use `model/effort (main|sub) task [skills]`, omit the brackets when no skill reads were observed, and omit the role when native metadata lacks it. Only after work completes does the skill call `task_summary` once for the whole-task snapshot in a distinct native `Task summary` log. That native MCP tool result is authoritative; the normal assistant answer does not repeat it as a blockquote, table, code block, or footer. Legacy clients may still request summary output through `show_activity`.
 
-The app owns execution-row labels, icons, grouping, and expansion. The skill reports at meaningful checkpoints and before the final answer; it does not poll or narrate every tool call. Ordinary task context and output tokens cover these snapshots. No separate reporting agent or model is used.
+Rows display `gpt-6-astra` as `GPT-6-Astra` and `gpt-5.6-sol` as `GPT-5.6-Sol`; other model IDs and raw metadata remain unchanged.
+
+The app owns execution-row labels, icons, grouping, and expansion. Its in-progress renderer does not surface hook-run details, and MCP tool results may be collapsed. Keep Mallo calls separate from unrelated tool calls. Place the final snapshot after the substantive completion update and immediately before the final answer; a completed single-tool activity can render directly in the current Desktop renderer. This does not guarantee standalone placement for all progress logs or app views. The explicit post-dispatch snapshot provides immediate visibility without polling or duplicate commentary. Later snapshots repeat only for a meaningful read, completion, or state change in that task. Ordinary task context and output tokens cover these snapshots. No separate reporting agent or model is used.
 
 ### Codex CLI
 
-Trusted observational hooks return only `systemMessage` or an empty object. Interactive CLI sessions show these as native warning lines. Reader or display failures fail open and never block Codex execution.
+Trusted observational hooks return only `systemMessage` or an empty object. Interactive CLI sessions show these as native warning lines, with model, effort, and skill reads associated with each task. Current `codex exec --json` event streams do not emit hook `systemMessage` events, so they cannot verify visible hook delivery. Reader or display failures fail open and never block Codex execution.
 
-The CLI also provides explicit `sessions`, `status`, and `watch` diagnostics. The MCP tools `show_activity` and `list_activity` expose the same read-only history. `observe_activity` is reserved for native hook delivery.
+The CLI also provides explicit `sessions`, `status`, and `watch` diagnostics. The MCP tools `show_activity`, `task_summary`, and `list_activity` expose the same read-only history. `observe_activity` is reserved for native hook delivery.
 
 No dedicated launcher, browser dashboard, HTTP server, background service, or app patch is part of the supported design.
 
@@ -52,7 +54,7 @@ Model and effort values are recorded metadata, not proof that a provider honored
 - [x] Incremental transcript reader and parent/worker association.
 - [x] Current-turn isolation, partial-record handling, and path containment.
 - [x] Read-only MCP tools and fail-open observational hooks.
-- [x] Compact Desktop checkpoint and final-summary format.
+- [x] Compact Desktop progress and final native summary logs.
 - [x] Interactive CLI progress and response-end warning delivery on Windows.
 - [x] Native plugin and skill discovery on Windows.
 - [x] Unit and transport fixture coverage.
@@ -68,4 +70,4 @@ Run all repository checks:
 npm test
 ```
 
-For integration changes, verify the affected native layer separately: plugin discovery, hook trust and delivery, MCP result logs, final assistant summary, or interactive CLI rendering. Use sanitized evidence only. Never publish raw transcripts or credentials.
+For integration changes, verify the affected native layer separately: plugin discovery, hook trust and delivery, focused MCP progress logs, final MCP summary logs, or interactive CLI rendering. Use sanitized evidence only. Never publish raw transcripts or credentials.

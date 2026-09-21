@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { appendFile, mkdtemp, mkdir, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 import { formatStatus, formatStatusLine, getStatus, listSessions } from "../plugins/codex-system/lib/activity.mjs";
 import { currentActivity } from "../plugins/codex-system/lib/observe.mjs";
@@ -15,6 +16,7 @@ const TURN_ACTIVE = "019d1000-0000-7000-8000-000000000003";
 const CHILD_TURN = "019d1000-0000-7000-8000-000000000004";
 const TOP_PATH_CHILD = "019d0000-0000-7000-8000-000000000008";
 const INVALID_PATH_CHILD = "019d0000-0000-7000-8000-000000000009";
+const cliPath = resolve("plugins/codex-system/cli.mjs");
 
 test("reads native parent/worker activity without retaining raw content", async () => {
   const root = await fixtureRoot();
@@ -32,6 +34,9 @@ test("reads native parent/worker activity without retaining raw content", async 
     event("task_complete", TURN_DONE, "2026-09-20T00:02:00Z"),
     event("task_started", TURN_ACTIVE, "2026-09-20T00:03:00Z"),
     context(TURN_ACTIVE, "gpt-5.6-sol", "high"),
+    response({ type: "function_call", name: "task_summary", call_id: "call-self-summary", arguments: JSON.stringify({ session_id: ROOT }) }),
+    response({ type: "function_call_output", call_id: "call-self-summary", output: "PRIVATE_SUMMARY" }),
+    response({ type: "custom_tool_call", name: "mcp__mallo__task_summary", call_id: "call-self-qualified", status: "completed", input: "PRIVATE_SUMMARY" }),
     response({ type: "custom_tool_call", name: "functions.exec", call_id: "call-patch", status: "completed", input: "const patch = 'Get-Content C:/skills/native-read/SKILL.md'; await tools.apply_patch(patch)" }),
     response({ type: "custom_tool_call", name: "functions.exec", call_id: "call-current", status: "in_progress", input: "await tools.exec_command({cmd:'Get-Content C:/skills/real-skill/SKILL.md; Set-Content C:/skills/write-only/SKILL.md -Value bad'}); await tools.exec_command({\"cmd\":\"Get-Content C:/skills/second-skill/SKILL.md\"}); await tools.exec_command({cmd:'Get-Content C:/skills/mallo/SKILL.md; Get-Content C:/skills/Codex-System:Mallo/SKILL.md; Get-Content C:/skills/mallo-helper/SKILL.md'})" }),
   ], "{partial");
@@ -56,6 +61,7 @@ test("reads native parent/worker activity without retaining raw content", async 
   assert.equal(status.agents[0].turns[0].state, "interrupted_or_unknown");
   assert.equal(status.agents[1].task_label, "compact_presentation");
   assert.equal(status.current.current_tool.name, "functions.exec");
+  assert(!status.agents[0].turns.at(-1).tools.some((tool) => tool.name.includes("task_summary")));
   assert.deepEqual(status.agents[0].turns.at(-1).skills.items.map((item) => item.name), ["real-skill", "second-skill", "mallo", "Codex-System:Mallo", "mallo-helper"]);
   assert(!serializedSkillNames(status).includes("native-read"));
   assert(!serializedSkillNames(status).includes("write-only"));
@@ -64,7 +70,7 @@ test("reads native parent/worker activity without retaining raw content", async 
   assert.equal(status.coverage.state, "partial");
   assert(status.coverage.warnings.some((warning) => warning.code === "partial_tail"));
   const serialized = JSON.stringify(status);
-  for (const secret of ["SECRET_PROMPT", "SECRET_RESULT", "SECRET_WORK", "SECRET_UNKNOWN"]) assert(!serialized.includes(secret));
+  for (const secret of ["SECRET_PROMPT", "SECRET_RESULT", "SECRET_WORK", "SECRET_UNKNOWN", "PRIVATE_SUMMARY"]) assert(!serialized.includes(secret));
   assert(!serialized.includes("Get-Content"));
   const line = formatStatusLine(status);
   assert(!line.includes("\n"));
@@ -82,48 +88,55 @@ test("reads native parent/worker activity without retaining raw content", async 
   assert.equal(current.native_state, "active");
   assert(!current.line.includes("workers 1"));
   assert.equal(current.steps.length, 1);
-  assert.equal(current.steps[0].task, "대화 작업");
-  assert.match(current.markdown, /^> \*\*Mallo 작업요약\*\*/);
-  assert(current.markdown.includes("> 대화 작업 \\(진행 중\\) · Sol\\/high ·"));
+  assert.equal(current.steps[0].task, "Main task");
+  assert(current.markdown.startsWith("> GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task"));
+  assert(current.markdown.includes("> GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task \\[real\\-skill"));
   assert.match(current.markdown, /mallo\\-helper/);
   assert(!current.markdown.includes("Codex-System:Mallo"));
-  assert.match(current.markdown, /관찰 범위 일부/);
+  assert.match(current.markdown, /Partial coverage/);
   assert(!/[>*]/.test(current.text));
   const activeSummary = await currentActivity({ session_id: ROOT, turn_id: TURN_ACTIVE, phase: "summary" }, { statusReader });
-  assert.match(activeSummary.line, /마무리 시점 · 대화 작업/);
-  assert(!activeSummary.line.includes("진행 중"));
-  assert(!activeSummary.line.includes("응답 완료"));
-  assert(!activeSummary.line.includes("성공"));
-  assert.match(activeSummary.markdown, /^> \*\*Mallo 작업요약\*\*/);
-  assert(!activeSummary.markdown.includes("응답 완료"));
+  assert.match(activeSummary.line, /Completion checkpoint · GPT-5.6-Sol\/high \(main\) Main task/);
+  assert(!activeSummary.line.includes("In progress"));
+  assert(!activeSummary.line.includes("Native turn completed"));
+  assert(!activeSummary.line.includes("success"));
+  assert(activeSummary.markdown.startsWith("> GPT\\-5\\.6\\-Sol\\/high \\(main\\) Main task"));
+  assert(!activeSummary.markdown.includes("Native turn completed"));
   const completed = await currentActivity({ session_id: ROOT, turn_id: TURN_DONE, phase: "summary" }, { statusReader });
-  assert.match(completed.line, /마무리 시점 · 네이티브 turn 응답 완료/);
+  assert.match(completed.line, /Completion checkpoint · Native turn completed/);
   assert.equal(completed.steps.length, 2);
   assert.deepEqual(completed.steps.map((step) => [step.task, step.model, step.effort]), [
-    ["대화 작업", "gpt-5.6-sol", "high"],
+    ["Main task", "gpt-5.6-sol", "high"],
     ["compact presentation", "gpt-6-astra", "high"],
   ]);
-  assert(!completed.line.includes("성공"));
-  assert(completed.markdown.includes("> compact presentation · Astra\\/high · 읽기 기록 없음  "));
+  assert(!completed.line.includes("success"));
+  assert(completed.markdown.includes("> GPT\\-6\\-Astra\\/high \\(sub\\) compact presentation"));
+  assert(!completed.markdown.includes("No skill read observed"));
+  const cliFocused = spawnSync(process.execPath, [cliPath, "status", "--session", ROOT, "--view", "current", "--phase", "progress", "--turn", TURN_DONE, "--focus-task", "compact_presentation", "--json"], { encoding: "utf8", env: { ...process.env, MALLO_TRANSCRIPT_ROOTS: root } });
+  assert.equal(cliFocused.status, 0, cliFocused.stderr);
+  const cliFocusedSnapshot = JSON.parse(cliFocused.stdout);
+  assert.deepEqual(cliFocusedSnapshot.steps.map((step) => [step.task, step.turn_id]), [["compact presentation", CHILD_TURN]]);
+  assert.match(cliFocusedSnapshot.text, /^GPT-6-Astra\/high \(sub\) compact presentation/);
+  assert.match(cliFocusedSnapshot.text, /Partial coverage/);
   const worker = await currentActivity({ session_id: CHILD, phase: "progress" }, { statusReader });
   assert.equal(worker.thread_id, CHILD);
   assert.equal(worker.turn_id, CHILD_TURN);
   assert.equal(worker.steps.length, 1);
   assert.equal(worker.steps[0].task, "compact presentation");
-  assert.match(worker.line, /compact presentation · Astra\/high/);
+  assert.match(worker.line, /GPT-6-Astra\/high \(sub\) compact presentation/);
   assert(!worker.line.includes("main gpt-5.6-sol"));
   const missing = await currentActivity({ session_id: ROOT, turn_id: CHILD_TURN, phase: "progress" }, { statusReader });
   assert.equal(missing.native_state, "unavailable");
   assert.equal(missing.turn_id, CHILD_TURN);
-  assert.equal(missing.line, "Mallo · 관찰 불가");
-  assert.equal(missing.text, "Mallo 작업요약\n\n관찰 불가");
+  assert.equal(missing.line, "Mallo · Activity unavailable");
+  assert.equal(missing.text, "Activity unavailable");
   assert.deepEqual(missing.steps, []);
-  assert.equal(missing.markdown, "> **Mallo 작업요약**\n>\n> 관찰 불가");
+  assert.equal(missing.markdown, "> Activity unavailable");
   const interrupted = await currentActivity({ session_id: ROOT, turn_id: TURN_OLD, phase: "progress" }, { statusReader });
   assert.equal(interrupted.native_state, "interrupted_or_unknown");
-  assert.match(interrupted.line, /네이티브 turn 상태 확인 불가/);
-  assert(!interrupted.line.includes("진행 중"));
-  assert(interrupted.markdown.includes("대화 작업 \\(상태 확인 불가\\)"));
+  assert.match(interrupted.line, /Native turn state unavailable/);
+  assert(!interrupted.line.includes("In progress"));
+  assert(interrupted.markdown.includes("Main task \\- state unavailable"));
   const grouped = await listSessions({ transcriptRoots: [root] });
   assert.equal(grouped.find((item) => item.session_id === ROOT).thread_count, 2);
 });
