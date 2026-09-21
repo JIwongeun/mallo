@@ -47,3 +47,5 @@ Use sanitized fixtures and temporary paths. Update README or implementation cont
 ## Plugin updates
 
 Codex caches plugins by the version in `plugins/codex-system/.codex-plugin/plugin.json`. Give each packaged update a new version before reinstalling, then verify it in a fresh task. Keep the root and packaged `LICENSE` copies identical. Updating a checkout alone does not refresh an already running task.
+
+For releases, align the package version, plugin manifest version, and MCP server version, then tag the tested commit as `vX.Y.Z`. Publish release notes from that tag. Development builds may use a `+codex.<timestamp>` cache suffix; published tags remain immutable except for a coordinated privacy or security correction.

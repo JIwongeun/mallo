@@ -2,7 +2,7 @@ import { createInterface } from "node:readline";
 import { formatStatus, getStatus, listSessions } from "./lib/activity.mjs";
 import { currentActivity, observeActivity } from "./lib/observe.mjs";
 
-const VERSION = "0.3.0";
+const VERSION = "0.3.1";
 const observerMemory = new Map();
 const tools = [
   {

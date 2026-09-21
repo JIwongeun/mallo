@@ -1,6 +1,6 @@
 {
   "name": "codex-system",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Read-only model, effort and skill activity for Codex.",
   "license": "MIT",
   "private": true,

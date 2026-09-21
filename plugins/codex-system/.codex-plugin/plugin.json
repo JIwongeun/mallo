@@ -1,6 +1,6 @@
 {
   "name": "codex-system",
-  "version": "0.3.0+codex.20260921042224",
+  "version": "0.3.1",
   "mcpServers": "./.mcp.json",
   "description": "Mallo shows models, effort and referenced skills for each Codex task, with native progress logs and a readable work summary.",
   "author": {
