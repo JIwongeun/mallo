@@ -1,16 +1,16 @@
 {
-  "name": "codex-system",
-  "version": "0.3.2+codex.20260921070423",
+  "name": "mallo",
+  "version": "0.3.2+codex.20260921071523",
   "mcpServers": "./.mcp.json",
-  "description": "See models, effort, and skill reads in Codex.",
+  "description": "See models, effort, and skill reads.",
   "author": {
     "name": "JIwongeun"
   },
   "skills": "./skills/",
   "interface": {
     "displayName": "Mallo",
-    "shortDescription": "See models, effort, and skill reads in Codex",
-    "longDescription": "Mallo shows observed model, effort, task, and skill reads as work happens, then summarizes the native turn in Codex activity logs. It reads local transcripts and needs no extra model or API key.",
+    "shortDescription": "See models, effort, and skill reads.",
+    "longDescription": "Mallo shows observed model, effort, task, and skill reads as work happens, then summarizes the native turn in activity logs. It reads local transcripts and needs no extra model or API key.",
     "developerName": "JIwongeun",
     "category": "Productivity",
     "capabilities": [

@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="plugins/codex-system/assets/mallo.png" width="110" alt="Mallo mascot">
+  <img src="plugins/mallo/assets/mallo.png" width="110" alt="Mallo mascot">
   <h1>Mallo</h1>
-  <p><strong>See models, effort, and skill reads in Codex.</strong></p>
+  <p><strong>See models, effort, and skill reads.</strong></p>
   <p>
     <a href="https://github.com/JIwongeun/mallo/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/JIwongeun/mallo/actions/workflows/ci.yml/badge.svg"></a>
     <img alt="Status: alpha" src="https://img.shields.io/badge/status-alpha-F59E0B">
@@ -11,7 +11,7 @@
   <p><a href="#install">Install</a> · <a href="#use">Use</a> · <a href="CONTRIBUTING.md">Contribute</a> · <a href="SECURITY.md">Security</a></p>
 </div>
 
-Mallo makes Codex activity easier to follow: which model and reasoning effort each task uses, and which skill files were read. It shows focused progress updates and one task summary in Codex's activity logs. Local and read-only, with no extra model calls.
+Mallo shows coding-agent activity: which model and reasoning effort each task uses, and which skill files were read. It shows focused progress updates and one task summary in native activity logs. Local and read-only, with no extra model calls.
 
 ## What you see
 
@@ -32,10 +32,10 @@ You need Node.js 24 or newer, Codex Desktop or CLI with plugin support, and the 
 git clone https://github.com/JIwongeun/mallo.git
 cd mallo
 codex plugin marketplace add .
-codex plugin add codex-system@personal
+codex plugin add mallo@mallo
 ```
 
-The `personal` marketplace name and `codex-system@personal` plugin ID are retained for update compatibility. If you already have a marketplace named `personal`, check `codex plugin list --json` before adding this one.
+If the old plugin is installed, run `codex plugin remove codex-system@personal` before adding `mallo@mallo` to avoid two copies.
 
 ## Use
 
@@ -51,7 +51,7 @@ From the source checkout:
 
 ```powershell
 git pull --ff-only
-codex plugin add codex-system@personal
+codex plugin add mallo@mallo
 ```
 
 Open a new Codex task after updating.

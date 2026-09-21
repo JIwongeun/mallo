@@ -1,6 +1,6 @@
 interface:
   display_name: "Mallo"
-  short_description: "See models, effort, and skill reads in Codex"
+  short_description: "See models, effort, and skill reads."
   default_prompt: "Use $mallo for focused Show activity checkpoints and one Task summary native tool log after completion, without repeating it in the assistant answer."
 policy:
   allow_implicit_invocation: true

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { chmod, copyFile, link, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, copyFile, link, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
@@ -8,11 +8,29 @@ import test from "node:test";
 
 const ROOT = "019d2000-0000-7000-8000-000000000001";
 const TURN = "019d2000-0000-7000-8000-000000000002";
-const serverPath = resolve("plugins/codex-system/server.mjs");
-const cliPath = resolve("plugins/codex-system/cli.mjs");
+const serverPath = resolve("plugins/mallo/server.mjs");
+const cliPath = resolve("plugins/mallo/cli.mjs");
+
+test("marketplace packages the self-contained Mallo identity", async () => {
+  const marketplace = JSON.parse(await readFile(resolve(".agents/plugins/marketplace.json"), "utf8"));
+  assert.equal(marketplace.name, "mallo");
+  assert.equal(marketplace.interface.displayName, "Mallo");
+  assert.deepEqual(marketplace.plugins.map((entry) => entry.name), ["mallo"]);
+  assert.deepEqual(marketplace.plugins[0].source, { source: "local", path: "./plugins/mallo" });
+  const pluginRoot = resolve(marketplace.plugins[0].source.path);
+  const manifest = JSON.parse(await readFile(resolve(pluginRoot, ".codex-plugin/plugin.json"), "utf8"));
+  assert.equal(manifest.name, "mallo");
+  assert.equal(manifest.interface.displayName, "Mallo");
+  const pkg = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  assert.equal(pkg.name, "mallo");
+  assert.equal(pkg.bin.mallo, "plugins/mallo/cli.mjs");
+  for (const file of [".mcp.json", "hooks/hooks.json", "server.mjs", "lib/activity.mjs", "lib/observe.mjs", "skills/mallo/SKILL.md", "assets/mallo.png"]) {
+    assert((await stat(resolve(pluginRoot, file))).isFile(), file);
+  }
+});
 
 test("native MCP hooks pass identifiers only and contain no control output", async () => {
-  const config = JSON.parse(await readFile(resolve("plugins/codex-system/hooks/hooks.json"), "utf8"));
+  const config = JSON.parse(await readFile(resolve("plugins/mallo/hooks/hooks.json"), "utf8"));
   assert.deepEqual(Object.keys(config.hooks), ["UserPromptSubmit", "PostToolUse", "SubagentStart", "SubagentStop", "Stop", "Interrupt"]);
   const serialized = JSON.stringify(config);
   for (const forbidden of ["prompt", "tool_input", "tool_response", "last_assistant_message", "additionalContext", "decision", "continue"]) assert(!serialized.includes(forbidden));
@@ -24,7 +42,7 @@ test("native MCP hooks pass identifiers only and contain no control output", asy
 });
 
 test("declared MCP config starts in a relocated plugin root without Codex on PATH", async (t) => {
-  const config = JSON.parse(await readFile(resolve("plugins/codex-system/.mcp.json"), "utf8"));
+  const config = JSON.parse(await readFile(resolve("plugins/mallo/.mcp.json"), "utf8"));
   const declared = config.mcpServers.mallo;
   assert.equal(declared.command, "node");
   assert.deepEqual(declared.args, ["server.mjs"]);
@@ -36,8 +54,8 @@ test("declared MCP config starts in a relocated plugin root without Codex on PAT
   await Promise.all([mkdir(join(plugin, "lib"), { recursive: true }), mkdir(bin, { recursive: true })]);
   await Promise.all([
     copyFile(serverPath, join(plugin, "server.mjs")),
-    copyFile(resolve("plugins/codex-system/lib/activity.mjs"), join(plugin, "lib", "activity.mjs")),
-    copyFile(resolve("plugins/codex-system/lib/observe.mjs"), join(plugin, "lib", "observe.mjs")),
+    copyFile(resolve("plugins/mallo/lib/activity.mjs"), join(plugin, "lib", "activity.mjs")),
+    copyFile(resolve("plugins/mallo/lib/observe.mjs"), join(plugin, "lib", "observe.mjs")),
   ]);
   const node = join(bin, process.platform === "win32" ? "node.exe" : "node");
   try { await link(process.execPath, node); }

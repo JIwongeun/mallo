@@ -2,7 +2,7 @@
 
 - Mallo has exactly two features: live model/effort/skill-read visibility and a completed native-turn activity summary.
 - Read existing Codex transcripts directly. No additional model calls, execution controller, routing policy, knowledge database, or replicated event store. A selected native Mallo skill may ask the current task agent to read compact snapshots whose results stay in native MCP tool-result logs; this consumes normal task tokens.
-- Keep the plugin self-contained under `plugins/codex-system/`. The legacy identifier stays for update compatibility; the product is Mallo.
+- Keep the plugin self-contained under `plugins/mallo/`. Its install identifier is `mallo@mallo`.
 - Use Node.js 24 built-ins and native Codex capabilities. Show compact inline activity lines, not a browser dashboard or custom card.
 - Observational hooks may return only systemMessage or an empty object. Never inject model context, block, continue a task, or alter execution. Deduplicate unchanged observations in memory.
 - Requested model/effort is not execution confirmation. Reading a skill is not proof of applying it. Missing read events do not prove no preloaded skill was used. Native turn completion is not independently verified project success.

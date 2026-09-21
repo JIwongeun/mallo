@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { currentActivity, observeActivity } from "../plugins/codex-system/lib/observe.mjs";
+import { currentActivity, observeActivity } from "../plugins/mallo/lib/observe.mjs";
 
 const SESSION = "019d3000-0000-7000-8000-000000000001";
 const TURN = "019d3000-0000-7000-8000-000000000002";
@@ -141,16 +141,18 @@ test("observer fails open and rejects control-character labels", async () => {
 });
 
 test("compact presentation hides only self reads and escapes untrusted Markdown labels", async () => {
-  const selfOnly = fixtureStatus({ skills: ["MALLO", "Codex-System:Mallo"], worker: "active", workerSkills: ["mallo"] });
+  const selfOnly = fixtureStatus({ skills: ["MALLO", "Mallo:Mallo", "Codex-System:Mallo"], worker: "active", workerSkills: ["mallo"] });
   const selfSnapshot = await currentActivity({ session_id: SESSION, turn_id: TURN, phase: "progress" }, { statusReader: async () => selfOnly });
   assert.equal(selfSnapshot.steps[0].skills.length, 0);
   assert.match(selfSnapshot.text, /GPT-6-Astra\/xhigh \(main\) Main task/);
   assert(!selfSnapshot.text.includes("Skill reads"));
   assert(!selfSnapshot.line.includes("Codex-System:Mallo"));
+  assert(!selfSnapshot.line.includes("Mallo:Mallo"));
   const selfHook = await observeActivity(input("PostToolUse"), new Map(), { statusReader: async () => selfOnly });
   assert.match(selfHook.systemMessage, /GPT-6-Astra\/xhigh \(main\) Main task/);
   assert(!selfHook.systemMessage.includes("Skill reads"));
   assert(!selfHook.systemMessage.includes("Codex-System:Mallo"));
+  assert(!selfHook.systemMessage.includes("Mallo:Mallo"));
   assert(selfOnly.agents[0].turns.at(-1).skills.items.some((item) => item.name === "MALLO"));
   assert(selfOnly.agents[1].turns.at(-1).skills.items.some((item) => item.name === "mallo"));
 

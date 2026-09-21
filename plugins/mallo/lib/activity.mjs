@@ -6,7 +6,7 @@ export const STATUS_SCHEMA_VERSION = 1;
 
 const ID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const MALLO_TOOLS = new Set(["show_activity", "task_summary", "list_activity", "observe_activity", "mcp__mallo__show_activity", "mcp__mallo__task_summary", "mcp__mallo__list_activity", "mcp__mallo__observe_activity"]);
-const SELF_SKILLS = new Set(["mallo", "codex-system:mallo"]);
+const SELF_SKILLS = new Set(["mallo", "mallo:mallo", "codex-system:mallo"]);
 const headerCache = new Map();
 const transcriptCache = new Map();
 const transcriptLocks = new Map();

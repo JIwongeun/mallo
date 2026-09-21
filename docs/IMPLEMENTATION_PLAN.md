@@ -44,8 +44,8 @@ Model and effort values are recorded metadata, not proof that a provider honored
 
 - Node.js 24 or newer, using built-in modules only.
 - MCP over stdio.
-- Self-contained plugin under `plugins/codex-system/`.
-- Product name `Mallo`; compatibility identifier `codex-system@personal`.
+- Self-contained plugin under `plugins/mallo/`.
+- Product name `Mallo`; install identifier `mallo@mallo`.
 - External skills, hooks, routing configuration, and native history remain unchanged.
 - Tests use temporary session roots.
 

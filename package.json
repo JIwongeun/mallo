@@ -1,7 +1,7 @@
 {
-  "name": "codex-system",
+  "name": "mallo",
   "version": "0.3.2",
-  "description": "See models, effort, and skill reads in Codex.",
+  "description": "See models, effort, and skill reads.",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -12,9 +12,9 @@
   "homepage": "https://github.com/JIwongeun/mallo#readme",
   "bugs": { "url": "https://github.com/JIwongeun/mallo/issues" },
   "engines": { "node": ">=24" },
-  "bin": { "mallo": "plugins/codex-system/cli.mjs" },
+  "bin": { "mallo": "plugins/mallo/cli.mjs" },
   "scripts": {
     "test": "node --test \"test/*.test.mjs\"",
-    "status": "node plugins/codex-system/cli.mjs sessions"
+    "status": "node plugins/mallo/cli.mjs sessions"
   }
 }

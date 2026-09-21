@@ -4,8 +4,8 @@ import { appendFile, mkdtemp, mkdir, symlink, writeFile } from "node:fs/promises
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { formatStatus, formatStatusLine, getStatus, listSessions } from "../plugins/codex-system/lib/activity.mjs";
-import { currentActivity } from "../plugins/codex-system/lib/observe.mjs";
+import { formatStatus, formatStatusLine, getStatus, listSessions } from "../plugins/mallo/lib/activity.mjs";
+import { currentActivity } from "../plugins/mallo/lib/observe.mjs";
 
 const ROOT = "019d0000-0000-7000-8000-000000000001";
 const CHILD = "019d0000-0000-7000-8000-000000000002";
@@ -16,7 +16,7 @@ const TURN_ACTIVE = "019d1000-0000-7000-8000-000000000003";
 const CHILD_TURN = "019d1000-0000-7000-8000-000000000004";
 const TOP_PATH_CHILD = "019d0000-0000-7000-8000-000000000008";
 const INVALID_PATH_CHILD = "019d0000-0000-7000-8000-000000000009";
-const cliPath = resolve("plugins/codex-system/cli.mjs");
+const cliPath = resolve("plugins/mallo/cli.mjs");
 
 test("reads native parent/worker activity without retaining raw content", async () => {
   const root = await fixtureRoot();

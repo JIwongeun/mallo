@@ -34,7 +34,7 @@ node --test "test/*.test.mjs"
 - Keep hooks observational and fail open.
 - Do not inject model context, block work, route models, or continue tasks.
 - Keep MCP on stdio; do not add a server or background service.
-- Preserve compatibility identifier `codex-system@personal`.
+- Keep the plugin install identifier `mallo@mallo`.
 - Keep native progress and `Task summary` tool results compact, with headerless English task rows. Do not repeat the summary in the assistant answer.
 - Add one focused test for new non-trivial logic.
 
@@ -46,6 +46,6 @@ Use sanitized fixtures and temporary paths. Update README or implementation cont
 
 ## Plugin updates
 
-Codex caches plugins by the version in `plugins/codex-system/.codex-plugin/plugin.json`. Give each packaged update a new version before reinstalling, then verify it in a fresh task. Keep the root and packaged `LICENSE` copies identical. Updating a checkout alone does not refresh an already running task.
+Codex caches plugins by the version in `plugins/mallo/.codex-plugin/plugin.json`. Give each packaged update a new version before reinstalling, then verify it in a fresh task. Keep the root and packaged `LICENSE` copies identical. Updating a checkout alone does not refresh an already running task.
 
 For releases, align the package version, plugin manifest version, and MCP server version, then tag the tested commit as `vX.Y.Z`. Publish release notes from that tag. Development builds may use a `+codex.<timestamp>` cache suffix; published tags remain immutable except for a coordinated privacy or security correction.

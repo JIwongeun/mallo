@@ -11,7 +11,7 @@ Integrate with the agent host that manages sessions, tools, skills, and workers.
 
 ## Smallest reusable boundary
 
-The existing `getStatus()` result in `plugins/codex-system/lib/activity.mjs` is the starting snapshot contract. Keep its provenance and coverage information; do not introduce a parallel event store.
+The existing `getStatus()` result in `plugins/mallo/lib/activity.mjs` is the starting snapshot contract. Keep its provenance and coverage information; do not introduce a parallel event store.
 
 - **Host reader:** read authorized native transcripts or documented events; resolve native session, task, parent, model, effort, skill evidence, and completion boundaries.
 - **Shared presentation:** select associated tasks, preserve separate worker turns, deduplicate unchanged observations, and format progress and summary rows.
@@ -19,7 +19,7 @@ The existing `getStatus()` result in `plugins/codex-system/lib/activity.mjs` is 
 
 `currentActivity()` already accepts a `statusReader`, but it is not portable unchanged: UUID validation, Codex hook names, and turn-window association still assume Codex. Keep ID and hook validation at host boundaries. Namespace internal identity by host and session; never correlate different hosts by a coincident ID or timestamp alone.
 
-Extract only presentation functions needed by a real second adapter. Avoid an adapter registry, generic plugin loader, new web service, or empty future-host directories. Keep the current Codex install self-contained and its `codex-system@personal` identifier compatible. Decide shared-source packaging with the second install target; each installed artifact must contain its runtime files and work without the development checkout.
+Extract only presentation functions needed by a real second adapter. Avoid an adapter registry, generic plugin loader, new web service, or empty future-host directories. Keep the current Codex install self-contained under `mallo@mallo`. Decide shared-source packaging with the second install target; each installed artifact must contain its runtime files and work without the development checkout.
 
 ## Evidence rules
 

@@ -1,14 +1,14 @@
 {
-  "name": "personal",
+  "name": "mallo",
   "interface": {
-    "displayName": "Personal"
+    "displayName": "Mallo"
   },
   "plugins": [
     {
-      "name": "codex-system",
+      "name": "mallo",
       "source": {
         "source": "local",
-        "path": "./plugins/codex-system"
+        "path": "./plugins/mallo"
       },
       "policy": {
         "installation": "AVAILABLE",
